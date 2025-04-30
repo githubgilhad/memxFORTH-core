@@ -12,7 +12,7 @@
 #include "io.h"
 #include "debug.h"
 _Static_assert(sizeof(uint32_t) == 4, "uint32_t must be 32 bits");
-_Static_assert(sizeof(__memx const void *) == 3, "__memx const void * must be 24 bits");
+_Static_assert(sizeof(const __memx void *) == 3, "const __memx void * must be 24 bits");
 
 /** {{{ Intro
  * Lets start programming FORTH
@@ -36,26 +36,26 @@ _Static_assert(sizeof(__memx const void *) == 3, "__memx const void * must be 24
  * 			* 3B pointer to function in FLASH (well it could be 2B on 328, but not on 2560, and we will use it together with other 3B pointers, so make ++/-- easy)
  * 			* anything else, which can be (type casted) at will
  * */ // }}}
-typedef void(*CodeWord_t)();	// CodeWord_t is 2B pointer to function (in FLASH) (*CodeWord_t)() calls the function.
-typedef __memx const CodeWord_t (*Data_t);	// Data_t is 3B pointer to CodeWord_t "somewhere"
-typedef __memx const Data_t (* InstrPoint_t);	// InstrPoint_t is 3B pointer to Data_t "somewhere"
-typedef void __memx const *PTR_t;	// universal 3B pointer to any data "somewhere"
+typedef const __memx void(*CodeWord_t)();	// CodeWord_t is 2B pointer to function (in FLASH) (*CodeWord_t)() calls the function.
+typedef const __memx CodeWord_t (*Data_t);	// Data_t is 3B pointer to CodeWord_t "somewhere"
+typedef const __memx Data_t (* InstrPoint_t);	// InstrPoint_t is 3B pointer to Data_t "somewhere"
+typedef void const __memx *PTR_t;	// universal 3B pointer to any data "somewhere"
 typedef uint16_t CELL_t;	// cell on data stack 2B
 
-typedef __memx const char *xpC;	// 3B pointer 1B target	pointer "somewhere" to char "somewhere"
-typedef __memx const uint8_t *xpB;	// 3B pointer 1B target	pointer "somewhere" to byte "somewhere"
-typedef __memx const uint32_t *xpD;
+typedef const __memx char *xpC;	// 3B pointer 1B target	pointer "somewhere" to char "somewhere"
+typedef const __memx uint8_t *xpB;	// 3B pointer 1B target	pointer "somewhere" to byte "somewhere"
+typedef const __memx uint32_t *xpD;
 
 
-extern __memx const char w_test_data;
-extern __memx const char w_quit_data;
+extern const __memx char w_test_data;
+extern const __memx char w_quit_data;
 typedef struct head1_t {	// {{{
-	__memx const struct head1_t *next;		// 3B: pointer to next header "somewhere"
+	const __memx struct head1_t *next;		// 3B: pointer to next header "somewhere"
 	uint8_t flags;		// 1B: 
 	uint8_t len;		// 1B: up to 31 (=5bits)
 	const char name[];	// len B:name of WORD
 } head1_t;	// }}}
-typedef __memx const head1_t	*xpHead1;	// 3B pointer to head1 "somewhere"
+typedef const __memx head1_t	*xpHead1;	// 3B pointer to head1 "somewhere"
 /*
  * typedef struct head2 {	// {{{
  * 	CodeWord_t codepoint;	// 3B: pointer to function to interpret data
@@ -73,13 +73,13 @@ PTR_t Rstck[STACK_LEN];
 PTR_t *Rstack=&Rstck[STACK_LEN];
 
 char RAM[RAM_LEN];
-char *HERE=&RAM[0];
+char *HERE=&RAM[3];
 CM head1_t *LAST;
 
-extern const __flash xpHead1		top_head;	// pointer to last header in asm module
-extern const __flash CodeWord_t		w_lit_cw;
-extern const __flash CodeWord_t		w_quit_cw;
-extern const __flash xpHead1		w_double;
+extern const __memx xpHead1		top_head;	// pointer to last header in asm module
+extern const __memx CodeWord_t		w_lit_cw;
+extern const __memx CodeWord_t		w_quit_cw;
+extern const __memx xpHead1		w_double;
 
 void track(const __memx char * label) {	 // {{{
 	info(label);
@@ -251,12 +251,12 @@ void f_docol() {	// {{{
 }	// }}}
 void f_exit(){	// {{{
 	info("f_exit");
-	IP=(InstrPoint_t  __memx const *)Rpop();
+	IP=(InstrPoint_t  const __memx *)Rpop();
 	NEXT;
 }	// }}}
 void f_lit(){	// {{{ README: LIT takes the next 3B pointer as 2B integer, ignores the top byte. This is done for taking the same 3B alingment in data
 	info(F("f_lit"));
-	push(*((__memx const CELL_t *)IP));
+	push(*((const __memx CELL_t *)IP));
 	++IP;
 	NEXT;
 }	// }}}
@@ -292,7 +292,7 @@ void f_number() {	// {{{ (addr n -- rest val) rest= #neprevedenych znaku
 }	// }}}
 void f_branch(){ 	 // {{{
 	info(F("f_branch"));
-	int16_t c=*((__memx const int16_t *)IP);
+	int16_t c=*((const __memx int16_t *)IP);
 	IP+=c;
 	NEXT;
 }	// }}}
@@ -341,9 +341,10 @@ void f_debug(void) {	// {{{ // === f_debug: return from FOTH or what ===
 	// f_next();	// No, simply no, return back to caler ...
 }	// }}}
 void print_words(void) {	// {{{ // === print all wocabulary
+	error(F("print_words"));
 	xpHead1 h=LAST;
 	while (h) {
-//		debug_dump(P24p(h),F("h"));
+		debug_dump(h,F("h	"));
 		if (h->flags & FLG_HIDDEN) write_str(F(CLR_GREY));
 		for (uint8_t i = 0; i < h->len; ++i) write_char(h->name[i]);
 		if (h->flags & FLG_HIDDEN) write_str(F(CLR_RESET));
@@ -351,6 +352,7 @@ void print_words(void) {	// {{{ // === print all wocabulary
 		h= h->next;
 		};
 	write_eoln();
+	error(F("print_words out"));
 }	// }}}
 void f_words(void) {	// {{{ print all words
 	error(F("f_words"));
@@ -358,16 +360,20 @@ void f_words(void) {	// {{{ print all words
 	NEXT;
 }	// }}}
 
-const __memx char f_words_name[]="WORDS";
+const __flash char f_words_name[]="WORDS";
 void my_setup(){	// {{{
+	nodebug=false;
+	RAM[0]='>';
+	RAM[1]='>';
+	RAM[2]='>';
 	LAST=(cmvp)&top_head;
 //	findHead(1,".",top_head);
 	error("Test");
 	xpHead1 temp_h=(xpHead1)HERE;
 	*(ptr24_u*)HERE=V(P24p(LAST)); HERE+=3;		// 3B next ptr
-	*HERE++=0;				// 1B attr
+	*HERE++ =0;				// 1B attr
 	uint8_t len=strlen_P(f_words_name);
-	*HERE++=len;				// 1B len "words"
+	*HERE++ =len;				// 1B len "words"
 	strcpy_P(HERE,f_words_name); HERE+=len;// len Bytes (+\0, but we overwrite it next step)
 	*(ptr24_u*)HERE=(ptr24_u){.u32=((uintptr_t)(&f_words)) * 2}; HERE+=3;	// codeword
 	LAST=temp_h;
@@ -418,12 +424,14 @@ debug_dump(u32p24(2*p24u32((cmvp)f_docol)),"2*f_docol");
 	IP=(cmvp)&start;
 	NEXT;
 	*/
-//	nodebug=false;
+	debug_dump(&RAM[0],"RAM	");
+	debug_dump(HERE,"HERE	");
+	debug_dump(LAST,"LAST	");
 	error(F("my_setup"));
 	IP = (cmvp)&w_test_data;
 //	IP=V(IP);
 	debug_dump(IP,F("IP\t"));
-	debug_dump(&f_docol,"&f_docol");
+	debug_dump((cmvp)&f_docol,"&f_docol");
 	push(0x21);
 	print_words();
 	NEXT;
@@ -432,7 +440,12 @@ debug_dump(u32p24(2*p24u32((cmvp)f_docol)),"2*f_docol");
 	IP = (cmvp)&w_quit_data;
 //	IP=V(IP);
 	debug_dump(IP,F("IP\t"));
-	debug_dump(&f_docol,"&f_docol");
+	debug_dump((cmvp)&f_docol,"&f_docol");
+	Rpush(IP);
+	IP=(cmvp)&f_docol;
+	debug_dump(IP,"(cmvp)&f_docol");
+	IP=Rpop();
+	
 	NEXT;
 	error(F("the end"));
 	while(1){;};

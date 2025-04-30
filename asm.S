@@ -18,7 +18,8 @@ RETX_0:
 	.global \lbl\()_head
 \lbl\():
 \lbl\()_head:
-	FLASH_PTR 1b-3	; prev header
+;	FLASH_PTR 1b-3	; prev header
+	.long 1b-3
 1:
 	.byte  \attr	; attributes
 	.byte len\@ 	; name len 
@@ -29,7 +30,8 @@ RETX_0:
 	.global \lbl\()_cw
 \lbl\()_cw:
 	.extern \codeword
-	FLASH_PTR \codeword				; 3B address of function in FLASH
+	.long \codeword				; 3B address of function in FLASH
+;	FLASH_PTR gs(\codeword)				; 3B address of function in FLASH
 	.global \lbl\()_data
 \lbl\()_data:
 	; more payload may be outside macro
@@ -74,7 +76,8 @@ DEFWORD w_double, 0, "DOUBLE", f_docol
 	FLASH_PTR w_dup_cw
 	FLASH_PTR w_plus_cw
 	FLASH_PTR w_exit_cw
-DEFWORD w_trouble, FLG_HIDDEN + FLG_IMMEDIATE, "TROUBLE", f_plus
+DEFWORD w_trouble, FLG_HIDDEN + FLG_IMMEDIATE, "TROUBLE", f_docol
+	.word gs(f_docol)
 DEFWORD w_debug, 0, "DEBUG", f_debug	; primitivum, kde se opet zmocnim vlady
 DEFWORD w_test, 0, "TEST", f_docol
 	FLASH_PTR w_double_cw
@@ -88,3 +91,4 @@ DEFWORD w_test, 0, "TEST", f_docol
 	.ascii "###>"
 	.global end
 end:
+.balign 65536, 'F'

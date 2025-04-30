@@ -1,4 +1,4 @@
 #pragma once
-#define VERSION_STRING "0.0.1-1-g80a705a++"
-#define VERSION_COMMIT "80a705a"
-#define VERSION_MESSAGE "MakeArduino.git  018e223 memxFORTH snad nejak chodi i kdyz nic neumi"
+#define VERSION_STRING "0.0.1-2-g89e6251++"
+#define VERSION_COMMIT "89e6251"
+#define VERSION_MESSAGE "Makefile version.h"
