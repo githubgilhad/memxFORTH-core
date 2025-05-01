@@ -19,7 +19,7 @@ RETX_0:
 \lbl\():
 \lbl\()_head:
 ;	FLASH_PTR 1b-3	; prev header
-	.long 1b-3
+	.long 1b-4
 1:
 	.byte  \attr	; attributes
 	.byte len\@ 	; name len 
@@ -44,10 +44,13 @@ RETX_0:
 .endm	; }}}
 
 ;;;; trick for STOP value for search: 0.header with none data
-	.byte 0,0,0 ; prev header none
+;	.byte 0,0,0 ; prev header none
+	.long 0
 1:
-	.byte 0+FLG_HIDDEN ;len 0 + FLG_HIDDEN = impossible to find
-	FLASH_PTR  0		; emty codeword
+	.byte FLG_HIDDEN
+	.byte 0 ;len 0 + FLG_HIDDEN = impossible to find
+;	FLASH_PTR  0		; emty codeword
+	.long 0
 
 ;;;; word definitions
 
@@ -85,7 +88,8 @@ DEFWORD w_test, 0, "TEST", f_docol
 	FLASH_PTR w_exit_cw
 
 	.global top_head
-	.EQU	top_head,1b-3
+;	.EQU	top_head,1b-3
+	.EQU	top_head,1b-4
 
 .balign 2
 	.ascii "###>"

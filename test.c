@@ -51,6 +51,7 @@ extern const __memx char w_test_data;
 extern const __memx char w_quit_data;
 typedef struct head1_t {	// {{{
 	const __memx struct head1_t *next;		// 3B: pointer to next header "somewhere"
+	uint8_t fill; // to 4B pointer
 	uint8_t flags;		// 1B: 
 	uint8_t len;		// 1B: up to 31 (=5bits)
 	const char name[];	// len B:name of WORD
@@ -344,7 +345,9 @@ void print_words(void) {	// {{{ // === print all wocabulary
 	error(F("print_words"));
 	xpHead1 h=LAST;
 	while (h) {
+write_str(F("\r\n\r\n\r\n"));
 		debug_dump(h,F("h	"));
+write_str(F("\r\n\r\n\r\n"));
 		if (h->flags & FLG_HIDDEN) write_str(F(CLR_GREY));
 		for (uint8_t i = 0; i < h->len; ++i) write_char(h->name[i]);
 		if (h->flags & FLG_HIDDEN) write_str(F(CLR_RESET));
@@ -370,12 +373,14 @@ void my_setup(){	// {{{
 //	findHead(1,".",top_head);
 	error("Test");
 	xpHead1 temp_h=(xpHead1)HERE;
-	*(ptr24_u*)HERE=V(P24p(LAST)); HERE+=3;		// 3B next ptr
+	*(ptr24_u*)HERE=V(P24p(LAST)); HERE+=4;		// 3B next ptr
+	*HERE++ =0;				// 4.B of next
 	*HERE++ =0;				// 1B attr
 	uint8_t len=strlen_P(f_words_name);
 	*HERE++ =len;				// 1B len "words"
 	strcpy_P(HERE,f_words_name); HERE+=len;// len Bytes (+\0, but we overwrite it next step)
 	*(ptr24_u*)HERE=(ptr24_u){.u32=((uintptr_t)(&f_words)) * 2}; HERE+=3;	// codeword
+	*HERE++ =0;				// 4.B of codeword
 	LAST=temp_h;
 	/*
 	xpC ac;

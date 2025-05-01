@@ -14,12 +14,14 @@ break my_setup
 
 # Zobrazíme registry a instrukce kolem PC
 display/i $pc
-display $r0
-display $r16
-display $r24
+# display $r0
+# display $r16
+# display $r24
 
 # SRAM ukázka
-display/x *(uint8_t*)0x0100  
+display/3xb IP
+display/3xb &LAST
+display/3xb LAST
 
 # Spustit program
 continue
