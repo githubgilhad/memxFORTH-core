@@ -9,16 +9,180 @@ here:
 	.global RETX_0
 RETX_0:
 	ret
-.macro FLASH_PTR addr	; {{{
-	.word \addr
-	.byte 0x00	; if this is 0x80+ (7.bit set) it is RAM, else it is FLASH
-.endm	; }}}
+	.global B3PTR
+	.type B3PTR, @function
+	.global B3U32
+	.type B3U32, @function
+	.global B3U32noRAM
+	.type B3U32noRAM, @function
+B3PTR:
+B3U32:
+	clr	r25
+	ret
+B3U32noRAM:
+	cbr	r24,0x80
+	clr	r25
+	ret
+	; extern uint8_t Bat(ptr24_t p);				; {{{
+	;	takes pointer somewhere	(24bit/32bit value)
+	;	read 1 byte (as __xload_1 does) and return it as uint8_t 
+	;
+	.global B1at
+	.type B1at, @function
+
+B1at:
+#if defined(__AVR_ATmega328P__)
+	; Adresa (__memx) je v r24:r22 (r22 = LSB)
+	; Vyčteme tři bajty z adresy r22:r24
+	movw r30, r22        ; ZL = r22, ZH = r23
+	lpm	r25, Z
+	sbrc	r24,7
+	ld	r22, Z
+	mv	r24,r25
+	ret
+#elif defined(__AVR_ATmega2560__)
+	; Adresa (__memx) je v r24:r22 (r22 = LSB)
+	; Vyčteme tři bajty z adresy r22:r24
+	movw r30, r22        ; ZL = r22, ZH = r23
+	sbrc	r24,7
+	rjmp	1f
+	in	r25,0x3b
+	out	0x3b,r24
+	elpm	r24, Z
+	out	0x3b,r25
+	ret
+1:
+	ld	r24, Z
+	ret
+#else
+	#error "B1at  - supported only for ATmega328P and ATmega2560"
+#endif
+; }}}
+	; extern B3 B3at(ptr24_t p);				; {{{
+	;	takes pointer somewhere	(24bit/32bit value)
+	;	read 3 bytes (as __xload_3 does) and return it as uint32_t (4.byte cleared)
+	;
+	.global B2at		; ptr24_t p=&w_someword_cw; uint32_t cw= B3at(p);
+	.type B2at, @function
+
+B2at:
+#if defined(__AVR_ATmega328P__)
+	; Adresa (__memx) je v r24:r22 (r22 = LSB)
+	; Vyčteme dva bajty z adresy r22:r24
+	movw r30, r22        ; ZL = r22, ZH = r23
+	sbrc	r24,7
+	rjmp	1f
+	lpm	r24, Z+
+	lpm	r25, Z+
+	ret
+1:
+	ld	r24, Z+
+	ld	r25, Z+
+	ret
+#elif defined(__AVR_ATmega2560__)
+	; Adresa (__memx) je v r24:r22 (r22 = LSB)
+	; Vyčteme dva bajty z adresy r22:r24
+	movw r30, r22        ; ZL = r22, ZH = r23
+	sbrc	r24,7
+	rjmp	1f
+	in	r23,0x3b
+	out	0x3b,r24
+	elpm	r24, Z+
+	elpm	r25, Z+
+	out	0x3b,r23
+	ret
+1:
+	ld	r24, Z+
+	ld	r25, Z+
+	ret
+#else
+	#error "B2at  - supported only for ATmega328P and ATmega2560"
+#endif
+; }}}
+	; extern B3 B3at(ptr24_t p);				; {{{
+	;	takes pointer somewhere	(24bit/32bit value)
+	;	read 3 bytes (as __xload_3 does) and return it as uint32_t (4.byte cleared)
+	;
+	.global B3at		; ptr24_t p=&w_someword_cw; uint32_t cw= B3at(p);
+	.type B3at, @function
+
+B3at:
+#if defined(__AVR_ATmega328P__)
+	; Adresa (__memx) je v r24:r22 (r22 = LSB)
+	; Vyčteme tři bajty z adresy r22:r24
+	movw r30, r22        ; ZL = r22, ZH = r23
+	sbrc	r24,7
+	rjmp	1f
+	lpm	r22, Z+
+	lpm	r23, Z+
+	lpm	r24, Z+
+	clr	r25
+	ret
+1:
+	ld	r22, Z+
+	ld	r23, Z+
+	ld	r24, Z+
+	clr	r25
+	ret
+#elif defined(__AVR_ATmega2560__)
+	; Adresa (__memx) je v r24:r22 (r22 = LSB)
+	; Vyčteme tři bajty z adresy r22:r24
+	movw r30, r22        ; ZL = r22, ZH = r23
+	sbrc	r24,7
+	rjmp	1f
+	in	r25,0x3b
+	out	0x3b,r24
+	elpm	r22, Z+
+	elpm	r23, Z+
+	elpm	r24, Z+
+	out	0x3b,r25
+	clr	r25
+	ret
+1:
+	ld	r22, Z+
+	ld	r23, Z+
+	ld	r24, Z+
+	clr	r25
+	ret
+#else
+	#error "B3at  - supported only for ATmega328P and ATmega2560"
+#endif
+; }}}
+	; extern void jmp_indirect_24(ptr24_t p);				; {{{
+	;	takes pointer to codeword somewhere	(24bit/32bit value)
+	;	read the codeword
+	;	divide by two (byte address -> word address)
+	;	jumps there
+	;
+	.global jmp_indirect_24		; ptr24_t p=&w_someword_cw; jmp_indirect_24(p);
+	.type jmp_indirect_24, @function
+
+jmp_indirect_24:
+	call B3at
+	; Dělení 2 (>>1) pro přechod z byte addr na word addr
+	lsr r24
+	ror r23
+	ror r22
+#if defined(__AVR_ATmega328P__)
+	; Pushujeme cílovou adresu na zásobník (2 bajty PC pro 328P)
+	push r22
+	push r23
+	ret                  ; Skok na cílovou adresu
+#elif defined(__AVR_ATmega2560__)
+	; Pushujeme cílovou adresu na zásobník (3 bajty PC pro 2560)
+	push r22
+	push r23
+	push r24
+	ret                  ; Skok na cílovou adresu
+#else
+	#error "jmp_indirect_24  - supported only for ATmega328P and ATmega2560"
+#endif
+; }}}
 .macro DEFWORD lbl, attr, name, codeword	; {{{
 	.global \lbl
 	.global \lbl\()_head
 \lbl\():
 \lbl\()_head:
-;	FLASH_PTR 1b-3	; prev header
 	.long 1b-4
 1:
 	.byte  \attr	; attributes
@@ -31,7 +195,6 @@ RETX_0:
 \lbl\()_cw:
 	.extern \codeword
 	.long \codeword				; 3B address of function in FLASH
-;	FLASH_PTR gs(\codeword)				; 3B address of function in FLASH
 	.global \lbl\()_data
 \lbl\()_data:
 	; more payload may be outside macro
@@ -44,13 +207,12 @@ RETX_0:
 .endm	; }}}
 
 ;;;; trick for STOP value for search: 0.header with none data
-;	.byte 0,0,0 ; prev header none
-	.long 0
+	.long 0		; prev header none
 1:
 	.byte FLG_HIDDEN
 	.byte 0 ;len 0 + FLG_HIDDEN = impossible to find
-;	FLASH_PTR  0		; emty codeword
-	.long 0
+	; zero bytes of name here
+	.long 0		; emty codeword
 
 ;;;; word definitions
 
@@ -72,20 +234,20 @@ DEFWORD w_dot,0,".",f_dot
 DEFWORD w_branch,0,"BRANCH",f_branch
 DEFWORD w_interpret,0,"INTERPRET",f_interpret
 DEFWORD w_quit,0,"QUIT",f_docol
-	FLASH_PTR w_interpret_cw
-	FLASH_PTR w_branch_cw
-	FLASH_PTR -2
+	.long w_interpret_cw
+	.long w_branch_cw
+	.long -2
 DEFWORD w_double, 0, "DOUBLE", f_docol
-	FLASH_PTR w_dup_cw
-	FLASH_PTR w_plus_cw
-	FLASH_PTR w_exit_cw
+	.long w_dup_cw
+	.long w_plus_cw
+	.long w_exit_cw
 DEFWORD w_trouble, FLG_HIDDEN + FLG_IMMEDIATE, "TROUBLE", f_docol
-	.word gs(f_docol)
+	.long w_exit_cw
 DEFWORD w_debug, 0, "DEBUG", f_debug	; primitivum, kde se opet zmocnim vlady
 DEFWORD w_test, 0, "TEST", f_docol
-	FLASH_PTR w_double_cw
-	FLASH_PTR w_debug_cw
-	FLASH_PTR w_exit_cw
+	.long w_double_cw
+	.long w_debug_cw
+	.long w_exit_cw
 
 	.global top_head
 ;	.EQU	top_head,1b-3

@@ -20,6 +20,7 @@ void info(const __memx char *c) { 	// {{{
 //	write_str(F( "\r\n"));
 }	// }}}
 
+// {{{ write_hexXX
 const __memx char hex[] = "0123456789ABCDEF";
 void write_hex8(uint8_t b) {
 	write_char(hex[(b >> 4) & 0xF]);
@@ -42,7 +43,7 @@ void write_hex32(uint32_t w) {
 	write_hex8((w >> 8) & 0xFF);
 	write_hex8(w & 0xFF);
 }
-
+// }}}
 
 #define RAM_START     ((uint32_t)0x800100)
 #define RAM_END       ((uint32_t)0x810000)
@@ -61,9 +62,11 @@ static inline uint8_t read_memx(uint32_t addr) {	 // {{{
 	ptr24_u x; x.u32=addr;
 	return *(volatile const __memx uint8_t*)x.p24;
 }	// }}}
-void debug_dump(const __memx void * address, const __memx char* label) {	 // {{{
+//void debug_dump(const __memx void * address, const __memx char* label) {	 
+void debug_dump(uint32_t address, const __memx char* label) {	 // {{{
 	if (nodebug) return;
-	uint32_t addr = p24u32(address);
+//	uint32_t addr = p24u32(address);
+	uint32_t addr = address;
 	uint32_t base = addr & ~0x0F;
 	uint32_t start = (base >= 16) ? base - 16 : base;
 

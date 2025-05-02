@@ -11,6 +11,7 @@ layout regs
 
 # Automaticky nastavíme breakpoint na main
 break my_setup
+break f_next
 
 # Zobrazíme registry a instrukce kolem PC
 display/i $pc
@@ -19,7 +20,7 @@ display/i $pc
 # display $r24
 
 # SRAM ukázka
-display/3xb IP
+display/3bx &IP
 display/3xb &LAST
 display/3xb LAST
 

@@ -11,6 +11,19 @@
 #include "ptr24.h"
 #include "io.h"
 #include "debug.h"
+extern uint8_t B1at(uint32_t p);			// asm.S	read 1 byte at address p (somewhere), return 1 byte
+extern uint16_t B2at(uint32_t p);			// asm.S	read 2 bytes at address p (somewhere), return 2 bytes
+extern uint32_t B3at(uint32_t p);			// asm.S	read 3 bytes at address p (somewhere), return 4 bytes (top cleared)
+extern const __memx void * B3PTR(uint32_t p);		// asm.S	typecast, get 3 bytes, return 4 bytes (top cleared)
+extern uint32_t B3U32(const __memx void * p);		// asm.S	typecast, get 3 bytes, return 4 bytes (top cleared)
+extern void jmp_indirect_24(uint32_t p);		// asm.S	call function, which byte_address is at address p (somewhere) (converts bytes to words)
+
+/*
+ * Decision:
+ * 	cell = uint16_t
+ * 	pointer = uint32_t, but only 3B used, 4.B always zero
+ */
+
 _Static_assert(sizeof(uint32_t) == 4, "uint32_t must be 32 bits");
 _Static_assert(sizeof(const __memx void *) == 3, "const __memx void * must be 24 bits");
 
@@ -24,7 +37,8 @@ _Static_assert(sizeof(const __memx void *) == 3, "const __memx void * must be 24
  * 		* only ASCII chars allowed (from space=0x20 upt to tilda=0x7F)
  * 		* 
  * 	* some FORTH words will be in FLASH
- * 		* so 3 bytes pointers are needed
+ * 		* so 3+ bytes pointers are needed
+ * 		* 3 bytes pointers are problematic and __memx is tricky, so let use uint32_t instead and few asm utils
  * the header is divided into two parts, first is for dictionary, followed second, which is for runing words
  * C discourse
  * 	* first we need 3bytes pointer to something
@@ -36,6 +50,7 @@ _Static_assert(sizeof(const __memx void *) == 3, "const __memx void * must be 24
  * 			* 3B pointer to function in FLASH (well it could be 2B on 328, but not on 2560, and we will use it together with other 3B pointers, so make ++/-- easy)
  * 			* anything else, which can be (type casted) at will
  * */ // }}}
+/*
 typedef const __memx void(*CodeWord_t)();	// CodeWord_t is 2B pointer to function (in FLASH) (*CodeWord_t)() calls the function.
 typedef const __memx CodeWord_t (*Data_t);	// Data_t is 3B pointer to CodeWord_t "somewhere"
 typedef const __memx Data_t (* InstrPoint_t);	// InstrPoint_t is 3B pointer to Data_t "somewhere"
@@ -47,8 +62,6 @@ typedef const __memx uint8_t *xpB;	// 3B pointer 1B target	pointer "somewhere" t
 typedef const __memx uint32_t *xpD;
 
 
-extern const __memx char w_test_data;
-extern const __memx char w_quit_data;
 typedef struct head1_t {	// {{{
 	const __memx struct head1_t *next;		// 3B: pointer to next header "somewhere"
 	uint8_t fill; // to 4B pointer
@@ -57,6 +70,7 @@ typedef struct head1_t {	// {{{
 	const char name[];	// len B:name of WORD
 } head1_t;	// }}}
 typedef const __memx head1_t	*xpHead1;	// 3B pointer to head1 "somewhere"
+*/
 /*
  * typedef struct head2 {	// {{{
  * 	CodeWord_t codepoint;	// 3B: pointer to function to interpret data
@@ -64,103 +78,131 @@ typedef const __memx head1_t	*xpHead1;	// 3B pointer to head1 "somewhere"
  * 	} head2;	// }}}
  */
 
-const __memx InstrPoint_t		*IP;
-const __memx Data_t			*DT;	// Value of last data pointed by IP before NEXT (= address of codepoint to exec) (used by f_docol to know, from where it was called)
+typedef const __memx void(*CodeWord_t)();	// CodeWord_t is 2B pointer to function (in FLASH) (*CodeWord_t)() calls the function.
+typedef const __memx CodeWord_t (*Data_t);	// Data_t is 3B pointer to CodeWord_t "somewhere"
+typedef const __memx char *xpC;	// 3B pointer 1B target	pointer "somewhere" to char "somewhere"
+typedef struct head1_t {	// {{{
+	const __memx struct head1_t *next;		// 3B: pointer to next header "somewhere"
+	uint8_t fill; // to 4B pointer
+	uint8_t flags;		// 1B: 
+	uint8_t len;		// 1B: up to 31 (=5bits)
+	const char name[];	// len B:name of WORD
+} head1_t;	// }}}
+typedef const __memx head1_t	*xpHead1;	// 3B pointer to head1 "somewhere"
+
+
+typedef uint32_t PTR_t; 	// universal "3B pointer" to any data "somewhere" - use B1at, B3at for dereferencing
+typedef uint16_t CELL_t;	// cell on data stack 2B
+typedef uint8_t  BYTE_t;	// something for pointers to points to
+
+PTR_t		IP;	// pointer to element of data[], which should be next
+PTR_t		DT;	// NEXT is **(IP++)() - so DT=*IP as internal step. DT is value of last data pointed by IP before NEXT (= address of codepoint to exec) (used by f_docol to know, from where it was called) -  f_docol= { Rpush(IP);IP=DT + x; NEXT} x=sizeof(codeword)
+/*
+ * STACKS:
+ *   for now I will use array and index, as it is easy to check range and only pop/push should be affected
+ *   also lets start with small value, so it can be tested for both under- and over- flow
+ *   also let push grow up and pop go down and 0 is empty stack (so push(x){stck[stack++]=x;}
+ */
 #define STACK_LEN	10
-#define RAM_LEN 	100	// 8B + name + 3B * (# words in definition)
-CELL_t stck[STACK_LEN];
-CELL_t *stack=&stck[STACK_LEN];
-PTR_t Rstck[STACK_LEN];
-PTR_t *Rstack=&Rstck[STACK_LEN];
+#define RSTACK_LEN	10
+CELL_t		stck[STACK_LEN];
+uint16_t	stack=0;
+PTR_t		Rstck[RSTACK_LEN];
+uint16_t	Rstack=0;
 
-char RAM[RAM_LEN];
-char *HERE=&RAM[3];
-CM head1_t *LAST;
+/*
+ * RAM:
+ * now let it be just small array too
+ * and test it until all works
+ */
+#define RAM_LEN 	100	// word ~ 10B + name + 4 * words called - for start some 5 words should be enought
+uint8_t RAM[RAM_LEN];
+uint8_t *HERE=&RAM[0];
 
-extern const __memx xpHead1		top_head;	// pointer to last header in asm module
-extern const __memx CodeWord_t		w_lit_cw;
-extern const __memx CodeWord_t		w_quit_cw;
-extern const __memx xpHead1		w_double;
+/*
+ * LAST
+ * pointer to begin of last header
+ */
+PTR_t LAST;
 
-void track(const __memx char * label) {	 // {{{
-	info(label);
-	write_str("IP= ");
-	write_hex24(p24u32((cmvp)IP));
-	write_str(" *IP= ");
-	write_hex24(p24u32((cmvp)*IP));
-//	write_str(" **IP= ");
-//	write_hex24(p24u32((cmvp)**IP));
-	write_str(" DT= ");
-	write_hex24(p24u32((cmvp)DT));
-	write_str(" *DT= ");
-	write_hex24(p24u32((cmvp)*DT));
-	write_str(" stck[");
-	write_hex24(&stck[STACK_LEN]-stack);
-	write_str("]= ");
-	write_hex24(*stack);
-	write_str("\r\n");
-debug_dump(IP,"IP	");
-//debug_dump(**IP,"**IP	");
-debug_dump(DT,"DT	");
-debug_dump(*DT,"*DT	");
-//debug_dump(**DT,"**DT	");
-debug_dump(stack,"stack	");
-debug_dump(Rstack,"Rstack	");
-}	// }}}
-extern void RETX_0();
-//	#define NEXT (*(*(*IP++)))()
+extern const __memx BYTE_t		top_head;	// pointer to last header in asm module
+extern const __memx BYTE_t		w_lit_cw;
+extern const __memx BYTE_t		w_quit_cw;
+extern const __memx BYTE_t		w_double;
+extern const __memx char w_test_data;
+extern const __memx char w_quit_data;
+
 #define NEXT f_next()
 void f_next(){
 	info("f_next");
-	DT=*IP;
+	DT=B3at(IP);
 debug_dump(IP,"IP old	");
-debug_dump(DT,"DT old	");
-//	track("f_next ");
 //	error("Press ANY key to continue");
-//	RETX_0();
 //	wait_for_char();
-	asm volatile ("" ::: "memory");
-//	__asm__ __volatile__ ("nop");
-//	__asm__ __volatile__ ("nop");
-	DT=*IP++;
+	IP+=4;		// IP++ but 4 bytes everytime 
 debug_dump(IP,"IP new	");
 debug_dump(DT,"DT new	");
-debug_dump(*DT,"*DT	");
-//	(*(*DT))();
-volatile CodeWord_t fx;
-fx=u32p24(p24u32(*DT)/2);
-//debug_dump((cmvp)fx,"fx");
-debug_dump(fx,"fx	");
-(*fx)();
-//	(*(*(*IP++)))();
+debug_dump(B3at(DT),"*DT	");
+	jmp_indirect_24(DT);
 }
-//	void f_next(){(*(*(*IP++)))();}
 
 // {{{ pop
 CELL_t pop() {
-	write_hex24(*stack);
+	if (stack==0) {
+		error(F("pop - Stack underflow"));
+		return 0;
+		};
+	write_hex16(stck[stack-1]);
 	info("pop");
-	return *(stack++);
+	return stck[--stack];
 }
 void push(CELL_t x) {
-	write_hex24(x);
+	write_hex16(x);
 	info("push");
-	*(--stack)=x;
+	if(stack>STACK_LEN-1) {
+		error(F("push - Stack owerlow"));
+		return;
+		};
+	stck[stack++]=x;
 }
-CELL_t peek(){ return *(stack);}
+CELL_t peek(){
+	if (stack==0) {
+		error(F("peek - No Stack left"));
+		return 0;
+		};
+	write_hex16(stck[stack-1]);
+	info("peek");
+	return stck[stack-1];
+}
 // }}}
-// {{{ Rpop
+// {{{ pop
 PTR_t Rpop() {
-	write_hex24(p24u32(*Rstack));
+	if (Rstack==0) {
+		error(F("Rpop - Stack underflow"));
+		return 0;
+		};
+	write_hex32(Rstck[Rstack-1]);
 	info("Rpop");
-	return *(Rstack++);
+	return Rstck[--Rstack];
 }
 void Rpush(PTR_t x) {
-	write_hex24(p24u32(x));
+	write_hex32(x);
 	info("Rpush");
-	*(--Rstack)=x;
+	if(Rstack>RSTACK_LEN-1) {
+		error(F("Rpush - Stack owerlow"));
+		return;
+		};
+	Rstck[Rstack++]=x;
 }
-PTR_t Rpeek(){ return *(Rstack);}
+PTR_t Rpeek(){
+	if (Rstack==0) {
+		error(F("Rpeek - No Stack left"));
+		return 0;
+		};
+	write_hex32(Rstck[Rstack-1]);
+	info("Rpeek");
+	return Rstck[Rstack-1];
+}
 // }}}
 // {{{ some internal functions
 uint8_t word_buf_len=0;
@@ -182,9 +224,9 @@ void get_word(){	 // {{{ WAITS for word and puts it into word_buf_len + word_buf
 xpHead1 findHead(uint8_t len,const char *wordname, xpHead1 h) { 	// {{{
 	len &= FLG_NOFLAG;
 	if (len==0) return NULL;
-	// FIXME:
-	while (h) {
-		if ((h->len & FLG_NOFLAG) != len) { h=h->next;continue;};
+	while (h) {	// internally it ends on .long 0
+		if (h->flags & FLG_HIDDEN) { h=h->next;continue;};
+		if (h->len != len) { h=h->next;continue;};
 		const char *c=wordname;
 		xpC hc=&(h->name[0]);
 		int16_t l=len;
@@ -194,20 +236,14 @@ xpHead1 findHead(uint8_t len,const char *wordname, xpHead1 h) { 	// {{{
 	}
 	return NULL;
 }	// }}}
-Data_t get_codeword_addr(xpHead1 h){	 // {{{
+uint32_t get_codeword_addr(xpHead1 h){	 // {{{ // Data_t
 	xpC c=&h->name[h->len];
-	return (Data_t)c;
-}	// }}}
-void write_hex(uint16_t i) { 	// {{{
-	write_str("0x");
-	char buf[32];
-	itoa(i, buf, 16);
-	write_str(&buf[0]);
+	return B3U32(c);
 }	// }}}
 // }}}
 
 
-#define VARfn(name)	void push_var_##name(){push((CELL_t)&name); NEXT;}
+#define VARfn(name)	void push_var_##name(){push(0x80);push((CELL_t)((uint16_t)(&name)));NEXT;}
 #define VAR(name,value)	CELL_t name=(CELL_t)value;VARfn(name)
 #define CONST(name,value)	void push_const_##name(){push(value); NEXT;}
 
@@ -244,35 +280,43 @@ void f_docol() {	// {{{
 	info(F("f_docol"));
 //	track("f_docol ");
 // error("Press ANY key to continue");wait_for_char();
-	Rpush((PTR_t)IP);
-	IP=(cmvp)(DT+1);	// README: DT points to 3B codeword, so DT+1 = DT+3B and now it is on Data[0] in the target header
+	Rpush(IP);
+	IP=DT+4;	// README: DT points to 4B codeword, so next address is DT+4B and now it is on Data[0] in the target header
 	debug_dump(IP,"IP in f_docol	");
 	debug_dump(DT,"DT in f_docol	");
 	NEXT;
 }	// }}}
 void f_exit(){	// {{{
 	info("f_exit");
-	IP=(InstrPoint_t  const __memx *)Rpop();
+	IP=Rpop();
 	NEXT;
 }	// }}}
-void f_lit(){	// {{{ README: LIT takes the next 3B pointer as 2B integer, ignores the top byte. This is done for taking the same 3B alingment in data
+void f_lit(){	// {{{ README: LIT takes the next 4B pointer as 2B integer, ignores the top byte. This is done for taking the same 4B alingment in data
 	info(F("f_lit"));
-	push(*((const __memx CELL_t *)IP));
-	++IP;
+	push(B2at(IP));
+	IP+=4;
 	NEXT;
 }	// }}}
+void comma(uint32_t d) {	// {{{
+	info(F("comma"));
+	*(uint32_t*)HERE=d;
+	HERE+=4;
+}	// }}}
+/*
 void comma(Data_t d) {	// {{{
 	info(F("comma"));
 	*(Data_t*)HERE=d;
-	HERE+=3;
+	HERE+=4;
 }	// }}}
+*/
 void f_comma() {	// {{{ take 3B address (2 CELLs) from datastack and put it to HERE
 	info(F("f_comma"));
 	CELL_t c=pop();
 	*(CELL_t *)HERE=c;
 	HERE+=2;
 	c=pop();
-	*HERE++=c;
+	*(CELL_t *)HERE=c;
+	HERE+=2;
 	NEXT;
 }	// }}}
 void f_dot() { 	 // {{{
@@ -283,7 +327,7 @@ void f_dot() { 	 // {{{
 	write_str(&buf[0]);
 	NEXT;
 }	// }}}
-void f_number() {	// {{{ (addr n -- rest val) rest= #neprevedenych znaku
+void f_number() {	// {{{ (addr n -- val rest ) rest= #neprevedenych znaku
 	info(F("f_number"));
 	CELL_t i=pop();
 	char *buf=(char *)pop();
@@ -293,8 +337,9 @@ void f_number() {	// {{{ (addr n -- rest val) rest= #neprevedenych znaku
 }	// }}}
 void f_branch(){ 	 // {{{
 	info(F("f_branch"));
-	int16_t c=*((const __memx int16_t *)IP);
-	IP+=c;
+	int16_t c=B2at(IP);
+	int32_t cc=4*c;
+	IP+=cc;
 	NEXT;
 }	// }}}
 void f_interpret(){	 // {{{
@@ -302,18 +347,15 @@ void f_interpret(){	 // {{{
 	write_str("?> ");
 	get_word();
 	info(" got: ");info(&word_buf[0]);
-	xpHead1 h=findHead(word_buf_len,&word_buf[0],LAST);
+	xpHead1 h=findHead(word_buf_len,&word_buf[0],B3PTR(LAST));
 //	write_str(" head found? ");
 //	debug_dump((cmvp)h,"head?");
 	if (h!=NULL) { // WORD
 //		write_str("yes");
-		Data_t d=get_codeword_addr(h);
 		if ((STATE==st_executing) || (h->len & FLG_IMMEDIATE)) {
-			CodeWord_t c=u32p24(p24u32(*d)/2);
-			debug_dump(c,"c()");
-			c();
+			jmp_indirect_24(get_codeword_addr(h));
 		} else {
-			comma(d);
+			comma(get_codeword_addr(h));
 		};
 	} else {
 		// Number ?
@@ -324,8 +366,9 @@ void f_interpret(){	 // {{{
 			if (STATE==st_executing) {
 				push(c);
 			} else {
-				comma(&w_lit_cw);
-				comma((Data_t)(char *)c);	// README: overtype from 2B data - 2B pointer - 3B pointer works
+				comma(B3U32(&w_lit_cw));
+//				comma((Data_t)(char *)c);	// README: overtype from 2B data - 2B pointer - 3B pointer works
+				comma(c);	// README: overtype from 2B data - 2B pointer - 3B pointer works
 			};
 		} else {
 			// it is not
@@ -343,11 +386,11 @@ void f_debug(void) {	// {{{ // === f_debug: return from FOTH or what ===
 }	// }}}
 void print_words(void) {	// {{{ // === print all wocabulary
 	error(F("print_words"));
-	xpHead1 h=LAST;
+	xpHead1 h=B3PTR(LAST);
 	while (h) {
-write_str(F("\r\n\r\n\r\n"));
-		debug_dump(h,F("h	"));
-write_str(F("\r\n\r\n\r\n"));
+//write_str(F("\r\n\r\n\r\n"));
+//		debug_dump(h,F("h	"));
+//write_str(F("\r\n\r\n\r\n"));
 		if (h->flags & FLG_HIDDEN) write_str(F(CLR_GREY));
 		for (uint8_t i = 0; i < h->len; ++i) write_char(h->name[i]);
 		if (h->flags & FLG_HIDDEN) write_str(F(CLR_RESET));
@@ -369,18 +412,17 @@ void my_setup(){	// {{{
 	RAM[0]='>';
 	RAM[1]='>';
 	RAM[2]='>';
-	LAST=(cmvp)&top_head;
+	LAST=B3U32(&top_head);
 //	findHead(1,".",top_head);
 	error("Test");
-	xpHead1 temp_h=(xpHead1)HERE;
-	*(ptr24_u*)HERE=V(P24p(LAST)); HERE+=4;		// 3B next ptr
-	*HERE++ =0;				// 4.B of next
-	*HERE++ =0;				// 1B attr
+	uint32_t temp_h=B3U32(HERE);
+	*(uint32_t*)HERE=LAST; HERE+=4;		// 3B next ptr
+	*(uint8_t*)HERE++ =0;			// 1B attr
 	uint8_t len=strlen_P(f_words_name);
-	*HERE++ =len;				// 1B len "words"
-	strcpy_P(HERE,f_words_name); HERE+=len;// len Bytes (+\0, but we overwrite it next step)
-	*(ptr24_u*)HERE=(ptr24_u){.u32=((uintptr_t)(&f_words)) * 2}; HERE+=3;	// codeword
-	*HERE++ =0;				// 4.B of codeword
+	*(uint8_t*)HERE++ =len;				// 1B len "words"
+	strcpy_P((char*)HERE,f_words_name); HERE+=len;// len Bytes (+\0, but we overwrite it next step)
+	uint16_t cw=(uint16_t)&f_words;
+	*(uint32_t*)HERE=cw * 2; HERE+=4;	// codeword
 	LAST=temp_h;
 	/*
 	xpC ac;
@@ -429,25 +471,25 @@ debug_dump(u32p24(2*p24u32((cmvp)f_docol)),"2*f_docol");
 	IP=(cmvp)&start;
 	NEXT;
 	*/
-	debug_dump(&RAM[0],"RAM	");
-	debug_dump(HERE,"HERE	");
+	debug_dump(B3U32(&RAM[0]),"RAM	");
+	debug_dump(B3U32(HERE),"HERE	");
 	debug_dump(LAST,"LAST	");
 	error(F("my_setup"));
-	IP = (cmvp)&w_test_data;
+	IP = B3U32(&w_test_data);
 //	IP=V(IP);
 	debug_dump(IP,F("IP\t"));
-	debug_dump((cmvp)&f_docol,"&f_docol");
+	debug_dump(B3U32(&f_docol),"&f_docol");
 	push(0x21);
 	print_words();
 	NEXT;
 	pop();
 	error(F("Full run"));
-	IP = (cmvp)&w_quit_data;
+	IP = B3U32(&w_quit_data);
 //	IP=V(IP);
 	debug_dump(IP,F("IP\t"));
-	debug_dump((cmvp)&f_docol,"&f_docol");
+	debug_dump(B3U32(&f_docol),"&f_docol");
 	Rpush(IP);
-	IP=(cmvp)&f_docol;
+	IP=B3U32(&f_docol);
 	debug_dump(IP,"(cmvp)&f_docol");
 	IP=Rpop();
 	

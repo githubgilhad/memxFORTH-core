@@ -3,3 +3,4 @@ Zaklad memxFORTHu - aby v nem slo programovat
 Zkopirovano z ssh://arduino@gitserver:1212/~/MakeArduino.git
 * 018e223 memxFORTH snad nejak chodi i kdyz nic neumi
 
+simavr -vvv --mcu atmega2560 --gdb build-mega-atmega2560/memxFORTH-core.elf
