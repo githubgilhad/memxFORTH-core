@@ -22,5 +22,6 @@ bool is_flash_address(uint32_t addr);
 //void debug_dump(const __memx void * address, const __memx char* label);
 void debug_dump(uint32_t address, const __memx char* label);
 extern bool nodebug;
+extern bool noinfo;
 
 #endif

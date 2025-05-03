@@ -14,6 +14,7 @@
 extern uint8_t B1at(uint32_t p);			// asm.S	read 1 byte at address p (somewhere), return 1 byte
 extern uint16_t B2at(uint32_t p);			// asm.S	read 2 bytes at address p (somewhere), return 2 bytes
 extern uint32_t B3at(uint32_t p);			// asm.S	read 3 bytes at address p (somewhere), return 4 bytes (top cleared)
+extern uint32_t B4at(uint32_t p);			// asm.S	read 4 bytes at address p (somewhere), return 4 bytes
 extern const __memx void * B3PTR(uint32_t p);		// asm.S	typecast, get 3 bytes, return 4 bytes (top cleared)
 extern uint32_t B3U32(const __memx void * p);		// asm.S	typecast, get 3 bytes, return 4 bytes (top cleared)
 extern void jmp_indirect_24(uint32_t p);		// asm.S	call function, which byte_address is at address p (somewhere) (converts bytes to words)
@@ -29,13 +30,13 @@ _Static_assert(sizeof(const __memx void *) == 3, "const __memx void * must be 24
 
 /** {{{ Intro
  * Lets start programming FORTH
- * My idea is 
+ * My idea is
  * 	* Indirect Threading
- * 	* long names for words 
+ * 	* long names for words
  * 		* well, possibly more than just 3 (of nano Forth)
  * 		* strictly less then 32 (so Pascal Length can be found backward)
  * 		* only ASCII chars allowed (from space=0x20 upt to tilda=0x7F)
- * 		* 
+ * 		*
  * 	* some FORTH words will be in FLASH
  * 		* so 3+ bytes pointers are needed
  * 		* 3 bytes pointers are problematic and __memx is tricky, so let use uint32_t instead and few asm utils
@@ -65,7 +66,7 @@ typedef const __memx uint32_t *xpD;
 typedef struct head1_t {	// {{{
 	const __memx struct head1_t *next;		// 3B: pointer to next header "somewhere"
 	uint8_t fill; // to 4B pointer
-	uint8_t flags;		// 1B: 
+	uint8_t flags;		// 1B:
 	uint8_t len;		// 1B: up to 31 (=5bits)
 	const char name[];	// len B:name of WORD
 } head1_t;	// }}}
@@ -84,7 +85,7 @@ typedef const __memx char *xpC;	// 3B pointer 1B target	pointer "somewhere" to c
 typedef struct head1_t {	// {{{
 	const __memx struct head1_t *next;		// 3B: pointer to next header "somewhere"
 	uint8_t fill; // to 4B pointer
-	uint8_t flags;		// 1B: 
+	uint8_t flags;		// 1B:
 	uint8_t len;		// 1B: up to 31 (=5bits)
 	const char name[];	// len B:name of WORD
 } head1_t;	// }}}
@@ -93,6 +94,7 @@ typedef const __memx head1_t	*xpHead1;	// 3B pointer to head1 "somewhere"
 
 typedef uint32_t PTR_t; 	// universal "3B pointer" to any data "somewhere" - use B1at, B3at for dereferencing
 typedef uint16_t CELL_t;	// cell on data stack 2B
+typedef uint32_t DOUBLE_t;	// 2 cell on data stack 4B
 typedef uint8_t  BYTE_t;	// something for pointers to points to
 
 PTR_t		IP;	// pointer to element of data[], which should be next
@@ -115,9 +117,10 @@ uint16_t	Rstack=0;
  * now let it be just small array too
  * and test it until all works
  */
-#define RAM_LEN 	100	// word ~ 10B + name + 4 * words called - for start some 5 words should be enought
+#define RAM_LEN 	320	// word ~ 10B + name + 4 * words called - for start some 10 words should be enought
 uint8_t RAM[RAM_LEN];
-uint8_t *HERE=&RAM[0];
+uint32_t HERE;
+//const __memx uint8_t *HERE;
 
 /*
  * LAST
@@ -139,25 +142,25 @@ void f_next(){
 debug_dump(IP,"IP old	");
 //	error("Press ANY key to continue");
 //	wait_for_char();
-	IP+=4;		// IP++ but 4 bytes everytime 
+	IP+=4;		// IP++ but 4 bytes everytime
 debug_dump(IP,"IP new	");
 debug_dump(DT,"DT new	");
 debug_dump(B3at(DT),"*DT	");
 	jmp_indirect_24(DT);
 }
 
-// {{{ pop
+// {{{ pop ...
 CELL_t pop() {
 	if (stack==0) {
 		error(F("pop - Stack underflow"));
 		return 0;
 		};
-	write_hex16(stck[stack-1]);
+	if (! noinfo) write_hex16(stck[stack-1]);
 	info("pop");
 	return stck[--stack];
 }
 void push(CELL_t x) {
-	write_hex16(x);
+	if (! noinfo) write_hex16(x);
 	info("push");
 	if(stack>STACK_LEN-1) {
 		error(F("push - Stack owerlow"));
@@ -166,27 +169,77 @@ void push(CELL_t x) {
 	stck[stack++]=x;
 }
 CELL_t peek(){
-	if (stack==0) {
+	if (stack<1) {
 		error(F("peek - No Stack left"));
 		return 0;
 		};
-	write_hex16(stck[stack-1]);
+	if (! noinfo) write_hex16(stck[stack-1]);
 	info("peek");
 	return stck[stack-1];
 }
+CELL_t peekX(uint8_t depth){
+	if (stack<1+depth) {
+		error(F("peek - No Stack left"));
+		return 0;
+		};
+	if (! noinfo) write_hex16(stck[stack-1-depth]);
+	info("peek");
+	return stck[stack-1-depth];
+}
 // }}}
-// {{{ pop
+// {{{ pop2 ...
+DOUBLE_t pop2() {
+	if (stack<2) {
+		error(F("pop2 - Stack underflow"));
+		return 0;
+		};
+	if (! noinfo) write_hex32((stck[stack-2]*(1L<<16))+stck[stack-1]);
+	info("pop2");
+	DOUBLE_t r=stck[stack-2]*(1L<<16)+stck[stack-1];
+	stack-=2;
+	return r;
+}
+void push2(DOUBLE_t x) {
+	if(stack>STACK_LEN-2) {
+		error(F("push2 - Stack owerlow"));
+		return;
+		};
+	if (! noinfo) write_hex32(x);
+	info("push2");
+	stck[stack++]=x>>16;
+	stck[stack++]=x&0xFFFF;
+}
+DOUBLE_t peek2(){
+	if (stack<2) {
+		error(F("peek2 - No Stack left"));
+		return 0;
+		};
+	if (! noinfo) write_hex32(stck[stack-2]*(1L<<16)+stck[stack-1]);
+	info("peek2");
+	return stck[stack-2]*(1L<<16)+stck[stack-1];
+}
+DOUBLE_t peek2X(uint8_t depth){
+	if (stack<2+depth) {
+		error(F("peek2 - No Stack left"));
+		return 0;
+		};
+	if (! noinfo) write_hex32(stck[stack-2-depth]*(1L<<16)+stck[stack-1-depth]);
+	info("peek2");
+	return stck[stack-2-depth]*(1L<<16)+stck[stack-1-depth];
+}
+// }}}
+// {{{ Rpop ...
 PTR_t Rpop() {
 	if (Rstack==0) {
 		error(F("Rpop - Stack underflow"));
 		return 0;
 		};
-	write_hex32(Rstck[Rstack-1]);
+	if (! noinfo) write_hex32(Rstck[Rstack-1]);
 	info("Rpop");
 	return Rstck[--Rstack];
 }
 void Rpush(PTR_t x) {
-	write_hex32(x);
+	if (! noinfo) write_hex32(x);
 	info("Rpush");
 	if(Rstack>RSTACK_LEN-1) {
 		error(F("Rpush - Stack owerlow"));
@@ -199,7 +252,7 @@ PTR_t Rpeek(){
 		error(F("Rpeek - No Stack left"));
 		return 0;
 		};
-	write_hex32(Rstck[Rstack-1]);
+	if (! noinfo) write_hex32(Rstck[Rstack-1]);
 	info("Rpeek");
 	return Rstck[Rstack-1];
 }
@@ -212,7 +265,7 @@ void get_word(){	 // {{{ WAITS for word and puts it into word_buf_len + word_buf
 	char c=' ';
 	while (true){
 		while (strchr(" \t\r\n",c)) c=wait_for_char();			// skip spaces
-		if (c=='\\') { 
+		if (c=='\\') {
 			while (!strchr("\r\n",c)) c=wait_for_char();
 			continue;
 			};	// skip \ comments to the end of line
@@ -242,10 +295,11 @@ uint32_t get_codeword_addr(xpHead1 h){	 // {{{ // Data_t
 }	// }}}
 // }}}
 
-
+void f_docol(); 	// FORWARD
 #define VARfn(name)	void push_var_##name(){push(0x80);push((CELL_t)((uint16_t)(&name)));NEXT;}
 #define VAR(name,value)	CELL_t name=(CELL_t)value;VARfn(name)
 #define CONST(name,value)	void push_const_##name(){push(value); NEXT;}
+#define CONST2(name,value)	void push_const_##name(){push2(value); NEXT;}
 
 typedef enum { st_executing, st_compiling} st_STATE;
 VARfn(LAST)	// LAST is in RAM, just points "somewhere"
@@ -253,7 +307,8 @@ st_STATE STATE=st_executing;
 VARfn(STATE)
 //uint8_t *HERE;
 VARfn(HERE)
-VAR(BASE,10)
+VAR(BASE,16)
+CONST2(DOCOL,B3U32(f_docol))
 // {{{ dup, plus, ...
 void f_dup(){	// {{{
 	info(F("f_dup"));
@@ -265,6 +320,46 @@ void f_plus(){	// {{{
 	push(pop()+pop());
 	NEXT;
 }	// }}}
+void f_minus(){	// {{{
+	info(F("f_minus"));
+	CELL_t c=pop();
+	push(pop()-c);
+	NEXT;
+}	// }}}
+void f_Store(){	// {{{ ! ( cell Daddr --  ) store cell at address(Double)
+	info(F("f_Store"));
+	DOUBLE_t d=pop2();
+	*(CELL_t*)B3PTR(d)=pop();
+	NEXT;
+}	// }}}
+void f_StoreChar(){	// {{{ !C ( char Daddr -- ) store char at address(Double)
+	info(F("f_StoreChar"));
+	DOUBLE_t d=pop2();
+	uint8_t v=pop();
+	*(uint8_t*)B3PTR(d)=v;
+	NEXT;
+}	// }}}
+void f_StoreDouble(){	// {{{ !D ( D Daddr -- ) store Double at address(Double)
+	info(F("f_StoreDouble"));
+	DOUBLE_t d=pop2();
+	*(uint32_t*)B3PTR(d)=pop2();
+	NEXT;
+}	// }}}
+void f_At(){	// {{{ @ ( Daddr -- cell ) cell at address(Double)
+	info(F("f_At"));
+	push(B2at(pop2()));
+	NEXT;
+}	// }}}
+void f_CharAt(){	// {{{ C@ ( Daddr -- char ) char at address(Double)
+	info(F("f_CharAt"));
+	push(B2at(pop2())&0xFF);
+	NEXT;
+}	// }}}
+void f_DoubleAt(){	// {{{ D@ ( Daddr -- D ) Double at address(Double)
+	info(F("f_DoubleAt"));
+	push2(B4at(pop2()));
+	NEXT;
+}	// }}}
 // }}}
 void f_key(){	 // {{{ WAITS for char and puts it on stack
 	push(wait_for_char());
@@ -272,7 +367,7 @@ void f_key(){	 // {{{ WAITS for char and puts it on stack
 }	// }}}
 void f_word() {	 // {{{ Put address and size of buff to stack
 	get_word();
-	push((CELL_t)&word_buf);
+	push2(B3U32(&word_buf));
 	push(word_buf_len);
 	NEXT;
 }	// }}}
@@ -297,9 +392,15 @@ void f_lit(){	// {{{ README: LIT takes the next 4B pointer as 2B integer, ignore
 	IP+=4;
 	NEXT;
 }	// }}}
+void f_lit2(){	// {{{ README: LIT takes the next 4B pointer as 4B integer. This is done for taking the same 4B alingment in data
+	info(F("f_lit2"));
+	push2(B4at(IP));
+	IP+=4;
+	NEXT;
+}	// }}}
 void comma(uint32_t d) {	// {{{
 	info(F("comma"));
-	*(uint32_t*)HERE=d;
+	*(uint32_t*)B3PTR(HERE)=d;
 	HERE+=4;
 }	// }}}
 /*
@@ -312,10 +413,10 @@ void comma(Data_t d) {	// {{{
 void f_comma() {	// {{{ take 3B address (2 CELLs) from datastack and put it to HERE
 	info(F("f_comma"));
 	CELL_t c=pop();
-	*(CELL_t *)HERE=c;
+	*(CELL_t *)B3PTR(HERE)=c;
 	HERE+=2;
 	c=pop();
-	*(CELL_t *)HERE=c;
+	*(CELL_t *)B3PTR(HERE)=c;
 	HERE+=2;
 	NEXT;
 }	// }}}
@@ -327,6 +428,7 @@ void f_dot() { 	 // {{{
 	write_str(&buf[0]);
 	NEXT;
 }	// }}}
+
 void f_number() {	// {{{ (addr n -- val rest ) rest= #neprevedenych znaku
 	info(F("f_number"));
 	CELL_t i=pop();
@@ -344,6 +446,12 @@ void f_branch(){ 	 // {{{
 }	// }}}
 void f_interpret(){	 // {{{
 	info(F("f_interpret"));
+	write_str("\r\n");
+	debug_dump(B3U32(&Rstck[Rstack]),F("Rstack	"));
+	debug_dump(B3U32(&stck[stack]),F("stack	"));
+	debug_dump((HERE),F("HERE	"));
+	if (stack>1) debug_dump(peek2(),F("*stack	"));
+	for (int8_t p=0;p<stack;p++) {write_char('[');write_hex16(stck[p]);write_char(']');};
 	write_str("?> ");
 	get_word();
 	info(" got: ");info(&word_buf[0]);
@@ -352,7 +460,9 @@ void f_interpret(){	 // {{{
 //	debug_dump((cmvp)h,"head?");
 	if (h!=NULL) { // WORD
 //		write_str("yes");
-		if ((STATE==st_executing) || (h->len & FLG_IMMEDIATE)) {
+		if ((STATE==st_executing) || (h->flags & FLG_IMMEDIATE)) {
+//			debug_dump(get_codeword_addr(h),"jump to	");
+			DT=get_codeword_addr(h);
 			jmp_indirect_24(get_codeword_addr(h));
 		} else {
 			comma(get_codeword_addr(h));
@@ -374,9 +484,9 @@ void f_interpret(){	 // {{{
 			// it is not
 			error("What is this?");error(&word_buf[0]);
 		}
+	};
 	info("end of f_interpret");
 	NEXT;
-	};
 	
 	// XXX
 }	// }}}
@@ -384,108 +494,127 @@ void f_debug(void) {	// {{{ // === f_debug: return from FOTH or what ===
 	error(F("f_debug"));
 	// f_next();	// No, simply no, return back to caler ...
 }	// }}}
+void f_doconst() {	// {{{
+	info(F("f_doconst"));
+	push(B4at(DT+4));
+	NEXT;
+}	// }}}
+void f_doconst2() {	// {{{
+	info(F("f_doconst2"));
+	push2(B4at(DT+4));
+	NEXT;
+}	// }}}
 void print_words(void) {	// {{{ // === print all wocabulary
-	error(F("print_words"));
+	info(F("print_words"));
 	xpHead1 h=B3PTR(LAST);
 	while (h) {
-//write_str(F("\r\n\r\n\r\n"));
-//		debug_dump(h,F("h	"));
-//write_str(F("\r\n\r\n\r\n"));
 		if (h->flags & FLG_HIDDEN) write_str(F(CLR_GREY));
+		if (h->flags & FLG_IMMEDIATE) write_str(F(BG_RED));
 		for (uint8_t i = 0; i < h->len; ++i) write_char(h->name[i]);
+		if (h->flags & FLG_IMMEDIATE) write_str(F(CLR_RESET));
 		if (h->flags & FLG_HIDDEN) write_str(F(CLR_RESET));
 		write_char(' ');
 		h= h->next;
 		};
 	write_eoln();
-	error(F("print_words out"));
 }	// }}}
 void f_words(void) {	// {{{ print all words
-	error(F("f_words"));
+	info(F("f_words"));
 	print_words();
 	NEXT;
 }	// }}}
-
-const __flash char f_words_name[]="WORDS";
+void f_dump() {	// {{{ ; Addr_of_header HIDE hide/unhide the word
+	info(F("f_dump"));
+	uint32_t addr=pop2();
+	bool d=nodebug;
+	nodebug=false;
+	write_eoln();
+	debug_dump(addr,F("dump	"));
+	nodebug=d;
+	NEXT;
+}	// }}}
+void f_nodebug() {	// {{{ ; Addr_of_header HIDE hide/unhide the word
+	info(F("f_nodebug"));
+	nodebug=(0==pop());
+	NEXT;
+}	// }}}
+void f_noinfo() {	// {{{ ; Addr_of_header HIDE hide/unhide the word
+	info(F("f_noinfo"));
+	noinfo=(0==pop());
+	NEXT;
+}	// }}}
+// {{{ more primitives
+void f_create(void) {	// {{{ create header of new word
+	error(F("f_create"));
+	uint32_t temp_h=HERE;
+	*(uint32_t*)B3PTR(HERE)=LAST; HERE+=4;		// 4B next ptr
+	*(uint8_t*)B3PTR(HERE) =0;HERE++;			// 1B attr
+	uint8_t len=pop();
+	*(uint8_t*)B3PTR(HERE) =len;HERE++;				// 1B len "words"
+//	strncpy_PF((char*)B3PTR(HERE),B3PTR(pop2()),len); HERE+=len;// len Bytes (+\0, but we overwrite it next step)
+	debug_dump(peek2(),"from buff	");
+	debug_dump((HERE),"HERE	");
+	uint32_t from=pop2();
+	// strncpy_PF((char*)B3PTR(HERE),pop2(),len); HERE+=len;// len Bytes (+\0, but we overwrite it next step)
+	for (uint8_t i=0; i<len;i++){
+		*(uint8_t*)B3PTR(HERE++) =*(uint8_t*)B3PTR(from++); 
+	};
+	debug_dump((HERE),"HERE	");
+	LAST=temp_h;
+	NEXT;
+}	// }}}
+void f_right_brac() {	// {{{ ; ] goes to compile mode
+	info(F("f_right_brac"));
+	STATE=st_compiling;
+	NEXT;
+}	// }}}
+void f_left_brac() {	// {{{ [ goes to immediate mode
+	info(F("f_left_brac"));
+	STATE=st_executing;
+	NEXT;
+}	// }}}
+void f_hide() {	// {{{ ; Addr_of_header HIDE hide/unhide the word
+	info(F("f_hide"));
+	uint32_t addr=pop2() + 4;	// flags
+	*(uint8_t *)B3PTR(addr) = B1at(addr) ^ FLG_HIDDEN;
+	NEXT;
+}	// }}}
+// }}}
+const __flash char f_words_name[]="WORDS2";
 void my_setup(){	// {{{
 	nodebug=false;
+	nodebug=true;
+	HERE=B3U32(&RAM[0]);
 	RAM[0]='>';
 	RAM[1]='>';
 	RAM[2]='>';
 	LAST=B3U32(&top_head);
-//	findHead(1,".",top_head);
 	error("Test");
-	uint32_t temp_h=B3U32(HERE);
-	*(uint32_t*)HERE=LAST; HERE+=4;		// 3B next ptr
-	*(uint8_t*)HERE++ =0;			// 1B attr
+	uint32_t temp_h=HERE;
+	*(uint32_t*)B3PTR(HERE)=LAST; HERE+=4;		// 3B next ptr
+	*(uint8_t*)B3PTR(HERE) =0;HERE++;			// 1B attr
 	uint8_t len=strlen_P(f_words_name);
-	*(uint8_t*)HERE++ =len;				// 1B len "words"
-	strcpy_P((char*)HERE,f_words_name); HERE+=len;// len Bytes (+\0, but we overwrite it next step)
+	*(uint8_t*)B3PTR(HERE) =len;HERE++;				// 1B len "words"
+	strcpy_P((char*)B3PTR(HERE),f_words_name); HERE+=len;// len Bytes (+\0, but we overwrite it next step)
 	uint16_t cw=(uint16_t)&f_words;
-	*(uint32_t*)HERE=cw * 2; HERE+=4;	// codeword
+	*(uint32_t*)B3PTR(HERE)=cw * 2; HERE+=4;	// codeword
 	LAST=temp_h;
-	/*
-	xpC ac;
-	ac=(xpC)0x00015B;
-	write_hex24((uint32_t)ac);
-	for (int i=0;i<16;i++) {write_hex24((uint32_t)ac);write_char(':');write_hex8(*ac);write_char(' ');write_charA(*ac++);write_str("\r\n");};
-	ac=(xpC)0x80015B;
-	write_hex24((uint32_t)ac);
-	for (int i=0;i<16;i++) {write_hex24((uint32_t)ac);write_char(':');write_hex8(*ac);write_char(' ');write_charA(*ac++);write_str("\r\n");};
-	*/
-	/*
-	debug_dump((cmvp)0x000253,"konec primitiv");
-	error("Zaciname");
-	write_eoln();
-	CodeWord_t const __memx *cp=&w_quit_cw;
-	debug_dump((cmvp)cp,"cp");
-	Data_t const __memx *dt=&cp;
-	debug_dump((cmvp)dt,"dt");
-	IP=&dt;
-	write_str(" IP= ");
-	write_hex24(p24u32((cmvp)IP));
-	write_str(" *IP= ");
-	write_hex(p24u32((cmvp)*IP));
-	write_str(" **IP= ");
-	write_hex(p24u32((cmvp)**IP));
-	write_str("\r\n");
-debug_dump(stack,"stack");
-debug_dump(&w_double,"&w_double");
-debug_dump(&top_head,"&top_head");
-debug_dump(&w_quit_cw,"&w_quit_cw");
-debug_dump(&w_lit_cw,"&w_lit_cw");
-debug_dump(f_docol,"f_docol");
-debug_dump(u32p24(2*p24u32((cmvp)f_docol)),"2*f_docol");
-	debug_dump(&w_quit_cw,"&w_quit_cw");
-	debug_dump(&w_lit_cw,"&w_lit_cw");
-	debug_dump(IP,"IP");
-	debug_dump(*IP,"*IP");
-//	debug_dump(**IP,"**IP");
-	debug_dump(f_interpret,"f_interpret");
-	debug_dump(dt,"dt");
-	debug_dump(*dt,"*dt");
-//	while(true){write_char(wait_for_char());write_str("cau ");};
-	//f_interpret();
-	error("sem jeste jo ");
-	const __memx void *start=&w_quit_cw;
-	IP=(cmvp)&start;
-	NEXT;
-	*/
+// --------------------------------------------------------------------------------
 	debug_dump(B3U32(&RAM[0]),"RAM	");
-	debug_dump(B3U32(HERE),"HERE	");
+	debug_dump((HERE),"HERE	");
 	debug_dump(LAST,"LAST	");
+// --------------------------------------------------------------------------------
 	error(F("my_setup"));
 	IP = B3U32(&w_test_data);
-//	IP=V(IP);
 	debug_dump(IP,F("IP\t"));
 	debug_dump(B3U32(&f_docol),"&f_docol");
 	push(0x21);
 	print_words();
 	NEXT;
 	pop();
+// --------------------------------------------------------------------------------
 	error(F("Full run"));
 	IP = B3U32(&w_quit_data);
-//	IP=V(IP);
 	debug_dump(IP,F("IP\t"));
 	debug_dump(B3U32(&f_docol),"&f_docol");
 	Rpush(IP);
@@ -494,6 +623,7 @@ debug_dump(u32p24(2*p24u32((cmvp)f_docol)),"2*f_docol");
 	IP=Rpop();
 	
 	NEXT;
+// --------------------------------------------------------------------------------
 	error(F("the end"));
 	while(1){;};
 

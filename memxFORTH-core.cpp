@@ -23,7 +23,7 @@ extern "C" {
 	}
 }
 void setup(){
-	Serial.begin(115200); //	(115200/9600);
+	Serial.begin(115200); //
 	while (!Serial){;};
 	Serial.println(F("1234567890."));
 	Serial.println(F(VERSION_STRING ));

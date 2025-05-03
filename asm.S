@@ -25,7 +25,7 @@ B3U32noRAM:
 	ret
 	; extern uint8_t Bat(ptr24_t p);				; {{{
 	;	takes pointer somewhere	(24bit/32bit value)
-	;	read 1 byte (as __xload_1 does) and return it as uint8_t 
+	;	read 1 byte (as __xload_1 does) and return it as uint8_t
 	;
 	.global B1at
 	.type B1at, @function
@@ -38,7 +38,7 @@ B1at:
 	lpm	r25, Z
 	sbrc	r24,7
 	ld	r22, Z
-	mv	r24,r25
+	mov	r24,r25
 	ret
 #elif defined(__AVR_ATmega2560__)
 	; Adresa (__memx) je v r24:r22 (r22 = LSB)
@@ -58,9 +58,9 @@ B1at:
 	#error "B1at  - supported only for ATmega328P and ATmega2560"
 #endif
 ; }}}
-	; extern B3 B3at(ptr24_t p);				; {{{
+	; extern B2 B2at(ptr24_t p);				; {{{
 	;	takes pointer somewhere	(24bit/32bit value)
-	;	read 3 bytes (as __xload_3 does) and return it as uint32_t (4.byte cleared)
+	;	read 2 bytes (as __xload_2 does) and return it as uint32_t (4.byte cleared)
 	;
 	.global B2at		; ptr24_t p=&w_someword_cw; uint32_t cw= B3at(p);
 	.type B2at, @function
@@ -148,6 +148,55 @@ B3at:
 	#error "B3at  - supported only for ATmega328P and ATmega2560"
 #endif
 ; }}}
+	; extern B4 B4at(ptr24_t p);				; {{{
+	;	takes pointer somewhere	(24bit/32bit value)
+	;	read 4 bytes (as __xload_3 does) and return it as uint32_t
+	;
+	.global B4at		; ptr24_t p=&w_someword_cw; uint32_t cw= B4at(p);
+	.type B4at, @function
+
+B4at:
+#if defined(__AVR_ATmega328P__)
+	; Adresa (__memx) je v r24:r22 (r22 = LSB)
+	; Vyčteme čtyři bajty z adresy r22:r24
+	movw r30, r22        ; ZL = r22, ZH = r23
+	sbrc	r24,7
+	rjmp	1f
+	lpm	r22, Z+
+	lpm	r23, Z+
+	lpm	r24, Z+
+	lpm	r25, Z+
+	ret
+1:
+	ld	r22, Z+
+	ld	r23, Z+
+	ld	r24, Z+
+	ld	r25, Z+
+	ret
+#elif defined(__AVR_ATmega2560__)
+	; Adresa (__memx) je v r24:r22 (r22 = LSB)
+	; Vyčteme tři bajty z adresy r22:r24
+	movw r30, r22        ; ZL = r22, ZH = r23
+	sbrc	r24,7
+	rjmp	1f
+	in	r21,0x3b
+	out	0x3b,r24
+	elpm	r22, Z+
+	elpm	r23, Z+
+	elpm	r24, Z+
+	elpm	r25, Z+
+	out	0x3b,r21
+	ret
+1:
+	ld	r22, Z+
+	ld	r23, Z+
+	ld	r24, Z+
+	ld	r25, Z+
+	ret
+#else
+	#error "B4at  - supported only for ATmega328P and ATmega2560"
+#endif
+; }}}
 	; extern void jmp_indirect_24(ptr24_t p);				; {{{
 	;	takes pointer to codeword somewhere	(24bit/32bit value)
 	;	read the codeword
@@ -186,7 +235,7 @@ jmp_indirect_24:
 	.long 1b-4
 1:
 	.byte  \attr	; attributes
-	.byte len\@ 	; name len 
+	.byte len\@ 	; name len
 	name_start_\@:
 	.ascii "\name"				; name without \0
 	.equ len\@,(. - name_start_\@)
@@ -205,7 +254,15 @@ jmp_indirect_24:
 .macro DEFCONST name	; {{{
 	DEFWORD const_\name,0,"\name",push_const_\name
 .endm	; }}}
-
+.macro DEFCONST1 name, value	; {{{
+	DEFWORD const_\name,0,"\name",f_lit
+	.long \value
+.endm	; }}}
+.macro DEFCONST2 name, value	; {{{
+	DEFWORD const_\name,0,"\name",f_doconst2
+	.long \value
+.endm	; }}}
+;  :s@DEFWORD [^,]*,[^,]*,[^,]*, *\([^ 	;]*\)[^;]*\(.*\)@void \1() {	// {{{ \2\r	info(F("\1"));\r	\r	NEXT;\r}	// }}}
 ;;;; trick for STOP value for search: 0.header with none data
 	.long 0		; prev header none
 1:
@@ -216,15 +273,44 @@ jmp_indirect_24:
 
 ;;;; word definitions
 
+.macro PORT name,value	; {{{
+DEFCONST2 PIN\name, 0x800000+\value
+DEFCONST2 DDR\name, 0x800001+\value
+DEFCONST2 PORT\name, 0x800002+\value
+.endm	; }}}
+#if defined(__AVR_ATmega328P__)
+PORT B, 0x23
+PORT C, 0x26
+PORT D, 0x29
+#elif defined(__AVR_ATmega2560__)
+PORT A, 0x20
+PORT B, 0x23
+PORT C, 0x26
+PORT D, 0x29
+PORT E, 0x2C
+PORT F, 0x2F
+PORT G, 0x32
+PORT H, 0x100
+PORT J, 0x103
+PORT K, 0x106
+PORT L, 0x109
+#endif
+DEFVAR HERE
 DEFVAR LAST
 DEFVAR STATE
 DEFVAR BASE
-;DEFCONST DOCOL
+DEFCONST2 DOCOL,f_docol
 DEFWORD w_lit, 0, "LIT", f_lit
-;DEFWORD w_docol,0,"DOCOL",f_docol
-;DEFWORD w_semicol,0,";",f_semicol
+DEFWORD w_lit2, 0, "LIT2", f_lit2
+DEFWORD w_Store, 0, "!", f_Store
+DEFWORD w_StoreChar, 0, "!C", f_StoreChar
+DEFWORD w_StoreDouble, 0, "!D", f_StoreDouble
+DEFWORD w_At, 0, "@", f_At
+DEFWORD w_CharAt, 0, "C@", f_CharAt
+DEFWORD w_DoubleAt, 0, "D@", f_DoubleAt
 DEFWORD w_dup, 0, "DUP", f_dup
 DEFWORD w_plus,0, "+", f_plus
+DEFWORD w_minus,0, "-", f_minus
 DEFWORD w_exit, 0, "EXIT", f_exit
 DEFWORD w_key,0, "KEY", f_key
 DEFWORD w_word,0,"WORD",f_word
@@ -233,10 +319,12 @@ DEFWORD w_number,0,"NUMBER",f_number
 DEFWORD w_dot,0,".",f_dot
 DEFWORD w_branch,0,"BRANCH",f_branch
 DEFWORD w_interpret,0,"INTERPRET",f_interpret
+DEFWORD w_words,0,"WORDS",f_words
 DEFWORD w_quit,0,"QUIT",f_docol
 	.long w_interpret_cw
 	.long w_branch_cw
 	.long -2
+; -------------------------------------------------------------------------------- tests
 DEFWORD w_double, 0, "DOUBLE", f_docol
 	.long w_dup_cw
 	.long w_plus_cw
@@ -248,6 +336,24 @@ DEFWORD w_test, 0, "TEST", f_docol
 	.long w_double_cw
 	.long w_debug_cw
 	.long w_exit_cw
+DEFWORD w_dump, 0, "dump", f_dump
+DEFWORD w_nodebug, 0, "nodebug", f_nodebug
+DEFWORD w_noinfo, 0, "noinfo", f_noinfo
+; -------------------------------------------------------------------------------- more primitives
+DEFWORD w_create, 0, "CREATE", f_create		; create head from WORD result
+DEFWORD w_left_brac, FLG_IMMEDIATE, "[", f_left_brac	; [ goes to immediate mode
+DEFWORD w_right_brac, 0, "]", f_right_brac	; ] goes to compile mode
+DEFWORD w_hide, 0, "HIDE", f_hide		; Addr_of_header HIDE hide/unhide the word
+; -------------------------------------------------------------------------------- more FORTH words
+DEFWORD w_colon,0,":",f_docol
+	.long w_word_cw, w_create_cw			; create header
+	.long w_lit2_cw, f_docol, w_comma_cw		; fill CW
+	.long var_LAST_cw, w_DoubleAt_cw, w_hide_cw	; hide until done
+	.long w_right_brac_cw, w_exit_cw		; go to conpile
+DEFWORD w_semicol,FLG_IMMEDIATE,";",f_docol
+	.long w_lit2_cw, w_exit_cw, w_comma_cw		; end word
+	.long var_LAST_cw, w_DoubleAt_cw, w_hide_cw	; unhide it
+	.long w_left_brac_cw, w_exit_cw			; back to immediate
 
 	.global top_head
 ;	.EQU	top_head,1b-3
@@ -257,4 +363,4 @@ DEFWORD w_test, 0, "TEST", f_docol
 	.ascii "###>"
 	.global end
 end:
-.balign 65536, 'F'
+//.balign 65536, 'F'

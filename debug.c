@@ -2,6 +2,7 @@
 // ,,g = gcc, exactly one space after "set"
 #include "debug.h"
 bool nodebug=true;
+bool noinfo=true;
 //bool nodebug=false;
 //
 extern void write_char(char c);
@@ -14,6 +15,7 @@ void error(const __memx char *c) { 	// {{{
 	write_str(F("»" CLR_RESET "\r\n"));// 0xC2 0xBB);//'»'
 }	// }}}
 void info(const __memx char *c) { 	// {{{
+	if (noinfo) return;
 	write_str(F(BG_BLUE STYLE_BOLD "«" )); //0xC2 0xAB);//'«'
 	while (*c){write_char(*c++);};
 	write_str(F("»" CLR_RESET ));// 0xC2 0xBB);//'»'
