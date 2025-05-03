@@ -29,7 +29,12 @@ void setup(){
 	Serial.println(F(VERSION_STRING ));
 	Serial.println(F("  based on " VERSION_COMMIT " - " VERSION_MESSAGE ));
 	Serial.println(F("---- ==== #### FORTH #### ==== ----"));
-	Serial.println(F("memxFORTH 4.test.0001"));
+	Serial.println(F("Hint: 1 nodebug 1 noinfo LAST D@ 20 + dump "));
+#if defined(__AVR_ATmega2560__)
+	Serial.println(F("Hint: hex ff DRDF !C aa PINF !C : x ff  PINF !C ; x "));
+#endif
+	Serial.println(F("Test: : xx 0BRANCH [ 0 2 , ] 5 ; : xxx IF 1111 ELSE 2222 FI 3333 + ;")); 
+
 	my_setup();
 	Serial.println(F("Setup done"));
 }

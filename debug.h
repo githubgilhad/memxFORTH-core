@@ -23,5 +23,7 @@ bool is_flash_address(uint32_t addr);
 void debug_dump(uint32_t address, const __memx char* label);
 extern bool nodebug;
 extern bool noinfo;
+	#define STR_2LESS "«" //0xC2 0xAB);//'«'
+	#define STR_2MORE "»" // 0xC2 0xBB);//'»'
 
 #endif

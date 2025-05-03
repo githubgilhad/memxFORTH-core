@@ -1,4 +1,4 @@
 #pragma once
-#define VERSION_STRING "0.0.1-5-g378e23e++"
-#define VERSION_COMMIT "378e23e"
-#define VERSION_MESSAGE "Pristup prez asm B3_funkce a uint32_t - uz to funguje"
+#define VERSION_STRING "0.0.1-6-g8b67a68++"
+#define VERSION_COMMIT "8b67a68"
+#define VERSION_MESSAGE "asi funguje plne"

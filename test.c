@@ -131,9 +131,12 @@ PTR_t LAST;
 extern const __memx BYTE_t		top_head;	// pointer to last header in asm module
 extern const __memx BYTE_t		w_lit_cw;
 extern const __memx BYTE_t		w_quit_cw;
+extern const __memx BYTE_t		w_exit_cw;
 extern const __memx BYTE_t		w_double;
 extern const __memx char w_test_data;
 extern const __memx char w_quit_data;
+extern const __memx DOUBLE_t		val_of_w_exit_cw;
+extern const __memx DOUBLE_t		val_of_f_docol;
 
 #define NEXT f_next()
 void f_next(){
@@ -275,7 +278,6 @@ void get_word(){	 // {{{ WAITS for word and puts it into word_buf_len + word_buf
 	word_buf_len=i;
 }	// }}}
 xpHead1 findHead(uint8_t len,const char *wordname, xpHead1 h) { 	// {{{
-	len &= FLG_NOFLAG;
 	if (len==0) return NULL;
 	while (h) {	// internally it ends on .long 0
 		if (h->flags & FLG_HIDDEN) { h=h->next;continue;};
@@ -290,6 +292,7 @@ xpHead1 findHead(uint8_t len,const char *wordname, xpHead1 h) { 	// {{{
 	return NULL;
 }	// }}}
 uint32_t get_codeword_addr(xpHead1 h){	 // {{{ // Data_t
+	if (!h) return 0;
 	xpC c=&h->name[h->len];
 	return B3U32(c);
 }	// }}}
@@ -315,6 +318,14 @@ void f_dup(){	// {{{
 	push(peek());
 	NEXT;
 }	// }}}
+void f_swap() {	// {{{
+	info(F("f_swap"));
+	CELL_t a=pop();
+	CELL_t b=pop();
+	push(a);
+	push(b);
+	NEXT;
+}	// }}}
 void f_plus(){	// {{{
 	info(F("f_plus"));
 	push(pop()+pop());
@@ -324,6 +335,72 @@ void f_minus(){	// {{{
 	info(F("f_minus"));
 	CELL_t c=pop();
 	push(pop()-c);
+	NEXT;
+}	// }}}
+void f_times() {	// {{{
+	info(F("f_times"));
+	push(pop()*pop());
+	NEXT;
+}	// }}}
+void f_div() {	// {{{
+	info(F("f_div"));
+	CELL_t a=pop();
+	push(pop()/a);
+	NEXT;
+}	// }}}
+void f_div2() {	// {{{
+	info(F("f_div2"));
+	push(pop()/2);
+	NEXT;
+}	// }}}
+void f_div4() {	// {{{
+	info(F("f_div4"));
+	push(pop()/4);
+	NEXT;
+}	// }}}
+void f_dup_D() {	// {{{
+	info(F("f_dup_D"));
+	push2(peek2());
+	NEXT;
+}	// }}}
+void f_swap_D() {	// {{{
+	info(F("f_swap_D"));
+	DOUBLE_t a=pop2();
+	DOUBLE_t b=pop2();
+	push2(a);
+	push2(b);
+	NEXT;
+}	// }}}
+void f_plus_D() {	// {{{
+	info(F("f_plus_D"));
+	push2(pop2()+pop2());
+	NEXT;
+}	// }}}
+void f_minus_D() {	// {{{
+	info(F("f_minus_D"));
+	DOUBLE_t c=pop2();
+	push2(pop2()-c);
+	NEXT;
+}	// }}}
+void f_times_D() {	// {{{
+	info(F("f_times_D"));
+	push2(pop2()*pop2());
+	NEXT;
+}	// }}}
+void f_div_D() {	// {{{
+	info(F("f_div_D"));
+	DOUBLE_t a=pop2();
+	push2(pop2()/a);
+	NEXT;
+}	// }}}
+void f_div2_D() {	// {{{
+	info(F("f_div2_D"));
+	push2(pop2()/2);
+	NEXT;
+}	// }}}
+void f_div4_D() {	// {{{
+	info(F("f_div4_D"));
+	push2(pop2()/4);
 	NEXT;
 }	// }}}
 void f_Store(){	// {{{ ! ( cell Daddr --  ) store cell at address(Double)
@@ -360,7 +437,92 @@ void f_DoubleAt(){	// {{{ D@ ( Daddr -- D ) Double at address(Double)
 	push2(B4at(pop2()));
 	NEXT;
 }	// }}}
+void f_hex(){	// {{{
+	info(F("f_hex"));
+	BASE=16;
+	NEXT;
+}	// }}}
+void f_dec(){	// {{{
+	info(F("f_dec"));
+	BASE=10;
+	NEXT;
+}	// }}}
+void f_bin(){	// {{{
+	info(F("f_bin"));
+	BASE=2;
+	NEXT;
+}	// }}}
 // }}}
+DOUBLE_t cw2h(DOUBLE_t cw) {	// {{{ codeword address to head address
+	info(F("cw2h"));
+	if (!cw) return 0;
+	uint8_t i =0;
+	cw--;
+	while ((i<33 ) && (i!=B1at(cw))) {i++;cw--;};
+	if (i<33) return cw-5;
+	return 0;
+}	// }}}
+void f_cw2h() {	// {{{ ; ( cw -- h ) convert codeword address to head address
+	info(F("f_cw2h"));
+	push2(cw2h(pop2()));
+	NEXT;
+}	// }}}
+uint8_t show_name(DOUBLE_t cw) {	// {{{ show name and address from codeword - return flags
+	DOUBLE_t h=cw2h(cw);
+	if (!h) {error(F("Not a word"));return 0;};
+	uint8_t flags,len;
+	flags=B1at(h+4);
+	len=B1at(h+5);
+	if (flags & FLG_HIDDEN) write_str(F("HIDDEN "));
+	if (flags & FLG_IMMEDIATE) write_str(F("IMMEDIATE "));
+	if (flags & FLG_ARG) write_str(F("ARG "));
+	write_str(F("len: "));write_hex8(len);write_str(F(", name: "));
+	write_str(F(STR_2LESS));
+	for (uint8_t i=0; i<len;i++) write_char(B1at(h+6+i));
+	write_str(F(STR_2MORE));
+	if (!noinfo) {
+		write_hex24(B3at(cw));
+		write_str(F(" @ "));write_hex24(h);
+		write_str(F(" (prev: ")); write_hex24(B3at(h));
+		write_str(F(") "));
+		};
+	return flags;
+}	// }}}
+void show(DOUBLE_t cw) {	// {{{ ; ' WORD show - try to show definition of WORD
+	info(F("show"));
+	DOUBLE_t h=cw2h(cw);
+	DOUBLE_t val;
+	uint8_t flags;
+	if (!h) {error(F("Not a word"));return;};
+	show_name(cw);
+	write_hex24(B3U32(f_docol));
+	write_eoln();
+	if (val_of_f_docol != B3at(cw)) return;	// neumim rozepsat
+	do {
+		cw+=4;
+		val=B4at(cw);
+		write_str(F("\t["));
+		write_hex32(val);
+		write_str(F("] "));
+		flags=show_name(val);
+		if (flags & FLG_ARG) {
+			cw+=4;
+			val=B4at(cw);
+			write_str(F("\r\n\t\t["));
+			write_hex32(val);
+			write_str(F("]"));
+			val=0;
+		};
+		write_eoln();
+	} while (val != val_of_w_exit_cw);
+
+}	// }}}
+void f_show() {	// {{{ ; ' WORD show - try to show definition of WORD
+	info(F("f_show"));
+	DOUBLE_t cw=pop2();
+	show(cw);
+	NEXT;
+}	// }}}
 void f_key(){	 // {{{ WAITS for char and puts it on stack
 	push(wait_for_char());
 	NEXT;
@@ -442,6 +604,65 @@ void f_branch(){ 	 // {{{
 	int16_t c=B2at(IP);
 	int32_t cc=4*c;
 	IP+=cc;
+	NEXT;
+}	// }}}
+void f_tick() {	// {{{ ; push CW_address of next word to stack (and skip it)
+	info(F("f_tick"));
+	if (STATE == st_executing) { // st_executing
+	info(F("st_executing"));
+		get_word();
+		xpHead1 h=findHead(word_buf_len,&word_buf[0],B3PTR(LAST));
+		push2(get_codeword_addr(h));
+	} else {
+	info(F("st_compiling"));
+		int32_t c=B2at(IP);
+		IP+=4;
+		push2(c);
+	};
+	NEXT;
+}	// }}}
+void f_immediate() {	// {{{ ; Addr_of_header IMMEDIATE make the word immediate
+	info(F("f_immediate"));
+	uint32_t h=pop2();
+	*(uint8_t *)B3PTR(h+4) |= FLG_IMMEDIATE;
+	NEXT;
+}	// }}}
+void f_0branch(){ 	 // {{{	; branch if zero
+	info(F("f_0branch"));
+	int16_t c=B2at(IP);
+	if ( pop()) c=1;
+	int32_t cc=4*c;
+	IP+=cc;
+	NEXT;
+}	// }}}
+void f_zero() {	// {{{ ; true if zero
+	info(F("f_zero"));
+	push(pop()==0?F_TRUE:F_FALSE);
+	NEXT;
+}	// }}}
+void f_not() {	// {{{ ; true if not zero
+	info(F("f_not"));
+	push(pop()!=0?F_FALSE:F_TRUE);
+	NEXT;
+}	// }}}
+void f_positive() {	// {{{ ; true if positive
+	info(F("f_positive"));
+	push(pop()>0?F_TRUE:F_FALSE);
+	NEXT;
+}	// }}}
+void f_positive0() {	// {{{ ; true if positive or zero
+	info(F("f_positive0"));
+	push(pop()>=0?F_TRUE:F_FALSE);
+	NEXT;
+}	// }}}
+void f_negative() {	// {{{ ; true if negative
+	info(F("f_negative"));
+	push(pop()<0?F_TRUE:F_FALSE);
+	NEXT;
+}	// }}}
+void f_negative0() {	// {{{ ; true if negative or zero
+	info(F("f_negative0"));
+	push(pop()<=0?F_TRUE:F_FALSE);
 	NEXT;
 }	// }}}
 void f_interpret(){	 // {{{
@@ -557,7 +778,7 @@ void f_create(void) {	// {{{ create header of new word
 	uint32_t from=pop2();
 	// strncpy_PF((char*)B3PTR(HERE),pop2(),len); HERE+=len;// len Bytes (+\0, but we overwrite it next step)
 	for (uint8_t i=0; i<len;i++){
-		*(uint8_t*)B3PTR(HERE++) =*(uint8_t*)B3PTR(from++); 
+		*(uint8_t*)B3PTR(HERE++) =*(uint8_t*)B3PTR(from++);
 	};
 	debug_dump((HERE),"HERE	");
 	LAST=temp_h;
@@ -573,10 +794,18 @@ void f_left_brac() {	// {{{ [ goes to immediate mode
 	STATE=st_executing;
 	NEXT;
 }	// }}}
-void f_hide() {	// {{{ ; Addr_of_header HIDE hide/unhide the word
-	info(F("f_hide"));
+void f_hidden() {	// {{{ ; Addr_of_header HIDDEN hide/unhide the word
+	info(F("f_hidden"));
 	uint32_t addr=pop2() + 4;	// flags
 	*(uint8_t *)B3PTR(addr) = B1at(addr) ^ FLG_HIDDEN;
+	NEXT;
+}	// }}}
+void f_find() {	// {{{ ; WORD FIND return Addr_of_header (or 0 0 )
+	info(F("f_find"));
+	uint8_t len=pop();
+	uint32_t addr=pop2();
+	xpHead1 h=findHead(len,B3PTR(addr),B3PTR(LAST));
+	push2(B3U32(h));
 	NEXT;
 }	// }}}
 // }}}
@@ -607,7 +836,8 @@ void my_setup(){	// {{{
 	error(F("my_setup"));
 	IP = B3U32(&w_test_data);
 	debug_dump(IP,F("IP\t"));
-	debug_dump(B3U32(&f_docol),"&f_docol");
+	debug_dump(val_of_f_docol,"val_of_f_docol");
+	debug_dump(val_of_w_exit_cw,"val_of_w_exit_cw");
 	push(0x21);
 	print_words();
 	NEXT;

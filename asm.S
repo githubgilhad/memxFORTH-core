@@ -255,7 +255,7 @@ jmp_indirect_24:
 	DEFWORD const_\name,0,"\name",push_const_\name
 .endm	; }}}
 .macro DEFCONST1 name, value	; {{{
-	DEFWORD const_\name,0,"\name",f_lit
+	DEFWORD const_\name,0,"\name",f_doconst
 	.long \value
 .endm	; }}}
 .macro DEFCONST2 name, value	; {{{
@@ -300,8 +300,8 @@ DEFVAR LAST
 DEFVAR STATE
 DEFVAR BASE
 DEFCONST2 DOCOL,f_docol
-DEFWORD w_lit, 0, "LIT", f_lit
-DEFWORD w_lit2, 0, "LIT2", f_lit2
+DEFWORD w_lit, FLG_ARG, "LIT", f_lit
+DEFWORD w_lit2, FLG_ARG, "LIT2", f_lit2
 DEFWORD w_Store, 0, "!", f_Store
 DEFWORD w_StoreChar, 0, "!C", f_StoreChar
 DEFWORD w_StoreDouble, 0, "!D", f_StoreDouble
@@ -309,21 +309,31 @@ DEFWORD w_At, 0, "@", f_At
 DEFWORD w_CharAt, 0, "C@", f_CharAt
 DEFWORD w_DoubleAt, 0, "D@", f_DoubleAt
 DEFWORD w_dup, 0, "DUP", f_dup
+DEFWORD w_swap, 0, "SWAP", f_swap
 DEFWORD w_plus,0, "+", f_plus
 DEFWORD w_minus,0, "-", f_minus
+DEFWORD w_times,0, "*", f_times
+DEFWORD w_div,0, "/", f_div
+DEFWORD w_div2,0, "/2", f_div2
+DEFWORD w_div4,0, "/4", f_div4
+DEFWORD w_dup_D, 0, "DUP2", f_dup_D
+DEFWORD w_swap_D, 0, "SWAP2", f_swap_D
+DEFWORD w_plus_D,0, "+D", f_plus_D
+DEFWORD w_minus_D,0, "-D", f_minus_D
+DEFWORD w_times_D,0, "*D", f_times_D
+DEFWORD w_div_D,0, "/D", f_div_D
+DEFWORD w_div2_D,0, "/2D", f_div2_D
+DEFWORD w_div4_D,0, "/4D", f_div4_D
 DEFWORD w_exit, 0, "EXIT", f_exit
 DEFWORD w_key,0, "KEY", f_key
 DEFWORD w_word,0,"WORD",f_word
 DEFWORD w_comma,0,",",f_comma
 DEFWORD w_number,0,"NUMBER",f_number
 DEFWORD w_dot,0,".",f_dot
-DEFWORD w_branch,0,"BRANCH",f_branch
+DEFWORD w_branch,FLG_ARG,"BRANCH",f_branch
+DEFWORD w_0branch,FLG_ARG,"0BRANCH",f_0branch	; branch if zero
 DEFWORD w_interpret,0,"INTERPRET",f_interpret
 DEFWORD w_words,0,"WORDS",f_words
-DEFWORD w_quit,0,"QUIT",f_docol
-	.long w_interpret_cw
-	.long w_branch_cw
-	.long -2
 ; -------------------------------------------------------------------------------- tests
 DEFWORD w_double, 0, "DOUBLE", f_docol
 	.long w_dup_cw
@@ -339,22 +349,61 @@ DEFWORD w_test, 0, "TEST", f_docol
 DEFWORD w_dump, 0, "dump", f_dump
 DEFWORD w_nodebug, 0, "nodebug", f_nodebug
 DEFWORD w_noinfo, 0, "noinfo", f_noinfo
+DEFWORD w_hex, 0, "hex", f_hex
+DEFWORD w_dec, 0, "dec", f_dec
+DEFWORD w_bin, 0, "bin", f_bin
+DEFWORD w_cw2h, 0, "cw2h", f_cw2h		; ( cw -- h ) convert codeword address to head address
+DEFWORD w_show, 0, "show", f_show		; ( cw -- ) show  try to show definition of WORD addressed by codeword
+DEFCONST1 ff, 0xFF
+DEFCONST1 aa, 0xAA
 ; -------------------------------------------------------------------------------- more primitives
 DEFWORD w_create, 0, "CREATE", f_create		; create head from WORD result
 DEFWORD w_left_brac, FLG_IMMEDIATE, "[", f_left_brac	; [ goes to immediate mode
 DEFWORD w_right_brac, 0, "]", f_right_brac	; ] goes to compile mode
-DEFWORD w_hide, 0, "HIDE", f_hide		; Addr_of_header HIDE hide/unhide the word
+DEFWORD w_find, 0, "FIND", f_find		; WORD FIND return Addr_of_header (or 0 0 )
+DEFWORD w_hidden, 0, "HIDDEN", f_hidden		; Addr_of_header HIDE hide/unhide the word
+DEFWORD w_tick, 0, "'", f_tick			; push CW_address of next word to stack (and skip it)
+DEFWORD w_immediate, 0, "IMMEDIATE", f_immediate; Addr_of_header IMMEDIATE make the word immediate
+DEFWORD w_zero, 0, "==0", f_zero		; true if zero
+DEFWORD w_not, 0, "!=0", f_not			; true if not zero
+DEFWORD w_positive, 0, ">0", f_positive		; true if positive
+DEFWORD w_positive0, 0, ">=0", f_positive0	; true if positive or zero
+DEFWORD w_negative, 0, "<0", f_negative		; true if negative
+DEFWORD w_negative0, 0, "<=0", f_negative0	; true if negative or zero
 ; -------------------------------------------------------------------------------- more FORTH words
+DEFWORD w_quit,0,"QUIT",f_docol
+	.long w_interpret_cw
+	.long w_branch_cw
+	.long -2
+DEFWORD w_hide, 0, "HIDE", f_docol		; HIDE WORD hide/unhide the word
+	.long w_word_cw,w_find_cw,w_hidden_cw,w_exit_cw
 DEFWORD w_colon,0,":",f_docol
 	.long w_word_cw, w_create_cw			; create header
 	.long w_lit2_cw, f_docol, w_comma_cw		; fill CW
-	.long var_LAST_cw, w_DoubleAt_cw, w_hide_cw	; hide until done
+	.long var_LAST_cw, w_DoubleAt_cw, w_hidden_cw	; hide until done
 	.long w_right_brac_cw, w_exit_cw		; go to conpile
 DEFWORD w_semicol,FLG_IMMEDIATE,";",f_docol
 	.long w_lit2_cw, w_exit_cw, w_comma_cw		; end word
-	.long var_LAST_cw, w_DoubleAt_cw, w_hide_cw	; unhide it
+	.long var_LAST_cw, w_DoubleAt_cw, w_hidden_cw	; unhide it
 	.long w_left_brac_cw, w_exit_cw			; back to immediate
+DEFWORD w_if, FLG_IMMEDIATE, "IF", f_docol		; do if not zero
+	.long w_tick_cw, w_0branch_cw,w_comma_cw	; if zero, branch
+	.long var_HERE_cw, w_DoubleAt_cw, w_lit2_cw,0,w_comma_cw	; save this pos, fill 0 for now
+	.long w_exit_cw
+DEFWORD w_fi, FLG_IMMEDIATE, "FI", f_docol		; fi - end of IF
+	.long w_dup_D_cw, var_HERE_cw, w_DoubleAt_cw, w_swap_D_cw, w_minus_D_cw, w_div4_D_cw, w_swap_D_cw,w_StoreDouble_cw,w_exit_cw
+DEFWORD w_then, FLG_IMMEDIATE, "THEN", f_docol		; fi - end of IF
+	.long w_fi_cw, w_exit_cw
+DEFWORD w_else, FLG_IMMEDIATE, "ELSE", f_docol		; else do this
+	.long w_tick_cw, w_branch_cw,w_comma_cw		; like in IF, but branch everytime
+	.long var_HERE_cw, w_DoubleAt_cw, w_lit2_cw, 0,w_comma_cw	; save this pos, fill 0 for now
+	.long w_swap_D_cw, w_fi_cw, w_exit_cw		; swap this and IFs address and fill it like FI
 
+	.global val_of_w_exit_cw, val_of_f_docol
+val_of_w_exit_cw:
+	.long w_exit_cw
+val_of_f_docol:
+	.long f_docol
 	.global top_head
 ;	.EQU	top_head,1b-3
 	.EQU	top_head,1b-4
