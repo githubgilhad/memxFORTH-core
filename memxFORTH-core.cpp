@@ -33,7 +33,7 @@ void setup(){
 #if defined(__AVR_ATmega2560__)
 	Serial.println(F("Hint: hex ff DRDF !C aa PINF !C : x ff  PINF !C ; x "));
 #endif
-	Serial.println(F("Test: : xx 0BRANCH [ 0 2 , ] 5 ; : xxx IF 1111 ELSE 2222 FI 3333 + ;")); 
+	Serial.println(F("Test: : xx 0BRANCH [ 0 3 , ] 5 ; : xxx IF 1111 ELSE 2222 FI 3333 + ;")); 
 
 	my_setup();
 	Serial.println(F("Setup done"));

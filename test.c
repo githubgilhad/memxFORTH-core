@@ -292,6 +292,7 @@ xpHead1 findHead(uint8_t len,const char *wordname, xpHead1 h) { 	// {{{
 	return NULL;
 }	// }}}
 uint32_t get_codeword_addr(xpHead1 h){	 // {{{ // Data_t
+	if (!(B3U32(h) & ~0x800000L)) return 0;
 	if (!h) return 0;
 	xpC c=&h->name[h->len];
 	return B3U32(c);
@@ -612,6 +613,7 @@ void f_tick() {	// {{{ ; push CW_address of next word to stack (and skip it)
 	info(F("st_executing"));
 		get_word();
 		xpHead1 h=findHead(word_buf_len,&word_buf[0],B3PTR(LAST));
+		write_hex32(B3U32(h));
 		push2(get_codeword_addr(h));
 	} else {
 	info(F("st_compiling"));
