@@ -3,9 +3,9 @@
 	:width: 250
 	:target: MemxFORTHChipandColorfulStack.png
 
-
-- `Interesting words <#interesting-words>`__
-- `Classical words <#classical-words>`__
+- `memxFORTH-core <#memxforth-core>`__
+	- `Interesting words <#interesting-words>`__
+	- `Classical words <#classical-words>`__
 
 memxFORTH-core
 ==============
