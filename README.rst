@@ -3,6 +3,10 @@
 	:width: 250
 	:target: MemxFORTHChipandColorfulStack.png
 
+
+- `Interesting words <#interesting-words>`__
+- `Classical words <#classical-words>`__
+
 memxFORTH-core
 ==============
 
@@ -91,7 +95,6 @@ Classical words
 - **KEY** (-- c) read character from input
 - **EXIT** end words definition
 
-Stack:
 
 - **/4D** (D -- D/4)
 - **/2D** (D -- D/2)
