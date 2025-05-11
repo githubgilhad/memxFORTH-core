@@ -12,6 +12,7 @@
 #define DEBUG_DUMPu(U,LBL) debug_dump((ptr24_u ){.u32=U},F(LBL));
 void error(const __memx char *c); 
 void info(const __memx char *c); 
+void trace(const __memx char *c); 
 void dump24(uint32_t w, const __memx char *label);
 void write_hex8(uint8_t b);
 void write_hex16(uint16_t b);
@@ -23,6 +24,7 @@ bool is_flash_address(uint32_t addr);
 void debug_dump(uint32_t address, const __memx char* label);
 extern bool nodebug;
 extern bool noinfo;
+extern bool notrace;
 	#define STR_2LESS "«" //0xC2 0xAB);//'«'
 	#define STR_2MORE "»" // 0xC2 0xBB);//'»'
 

@@ -29,9 +29,10 @@ void setup(){
 	Serial.println(F(VERSION_STRING ));
 	Serial.println(F("  based on " VERSION_COMMIT " - " VERSION_MESSAGE ));
 	Serial.println(F("---- ==== #### FORTH #### ==== ----"));
-	Serial.println(F("Hint: 1 nodebug 1 noinfo LAST D@ 20 + dump "));
+	Serial.println(F("Hint: 0 nodebug 0 noinfo 0 notrace LAST D@ 20 + dump "));
 #if defined(__AVR_ATmega2560__)
-	Serial.println(F("Hint: hex ff DRDF !C aa PINF !C : x ff  PINF !C ; x "));
+	Serial.println(F("Hint: hex ff DDRF !C aa PORTF !C ff DDRK !C aa PORTK !C : x ff  PINF !C ff  PINK !C ; x "));
+	Serial.println(F(": count BEGIN DUP c2C PORTF !C PORTK !C 1- DUP ==0 UNTIL c2C PORTF !C PORTK !C ; ffff count"));
 #endif
 	Serial.println(F("Test: : xx 0BRANCH [ 0 3 , ] 5 ; : xxx IF 1111 ELSE 2222 FI 3333 + ;")); 
 

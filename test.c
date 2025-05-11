@@ -300,10 +300,10 @@ uint32_t get_codeword_addr(xpHead1 h){	 // {{{ // Data_t
 // }}}
 
 void f_docol(); 	// FORWARD
-#define VARfn(name)	void push_var_##name(){push(0x80);push((CELL_t)((uint16_t)(&name)));NEXT;}
+#define VARfn(name)	void push_var_##name(){trace(F(#name));push(0x80);push((CELL_t)((uint16_t)(&name)));NEXT;}
 #define VAR(name,value)	CELL_t name=(CELL_t)value;VARfn(name)
-#define CONST(name,value)	void push_const_##name(){push(value); NEXT;}
-#define CONST2(name,value)	void push_const_##name(){push2(value); NEXT;}
+#define CONST(name,value)	void push_const_##name(){trace(F(#name));push(value); NEXT;}
+#define CONST2(name,value)	void push_const_##name(){trace(F(#name));push2(value); NEXT;}
 
 typedef enum { st_executing, st_compiling} st_STATE;
 VARfn(LAST)	// LAST is in RAM, just points "somewhere"
@@ -315,12 +315,17 @@ VAR(BASE,16)
 CONST2(DOCOL,B3U32(f_docol))
 // {{{ dup, plus, ...
 void f_dup(){	// {{{
-	info(F("f_dup"));
+	trace(F("DUP"));
 	push(peek());
 	NEXT;
 }	// }}}
+void f_drop(){	// {{{
+	trace(F("DROP"));
+	pop();
+	NEXT;
+}	// }}}
 void f_swap() {	// {{{
-	info(F("f_swap"));
+	trace(F("SWAP"));
 	CELL_t a=pop();
 	CELL_t b=pop();
 	push(a);
@@ -328,44 +333,49 @@ void f_swap() {	// {{{
 	NEXT;
 }	// }}}
 void f_plus(){	// {{{
-	info(F("f_plus"));
+	trace(F("+"));
 	push(pop()+pop());
 	NEXT;
 }	// }}}
 void f_minus(){	// {{{
-	info(F("f_minus"));
+	trace(F("-"));
 	CELL_t c=pop();
 	push(pop()-c);
 	NEXT;
 }	// }}}
 void f_times() {	// {{{
-	info(F("f_times"));
+	trace(F("*"));
 	push(pop()*pop());
 	NEXT;
 }	// }}}
 void f_div() {	// {{{
-	info(F("f_div"));
+	trace(F("/"));
 	CELL_t a=pop();
 	push(pop()/a);
 	NEXT;
 }	// }}}
 void f_div2() {	// {{{
-	info(F("f_div2"));
+	trace(F("/2"));
 	push(pop()/2);
 	NEXT;
 }	// }}}
 void f_div4() {	// {{{
-	info(F("f_div4"));
+	trace(F("/4"));
 	push(pop()/4);
 	NEXT;
 }	// }}}
 void f_dup_D() {	// {{{
-	info(F("f_dup_D"));
+	trace(F("DUP2"));
 	push2(peek2());
 	NEXT;
 }	// }}}
+void f_drop_D() {	// {{{
+	trace(F("DROP2"));
+	pop2();
+	NEXT;
+}	// }}}
 void f_swap_D() {	// {{{
-	info(F("f_swap_D"));
+	trace(F("SWAP2"));
 	DOUBLE_t a=pop2();
 	DOUBLE_t b=pop2();
 	push2(a);
@@ -373,89 +383,131 @@ void f_swap_D() {	// {{{
 	NEXT;
 }	// }}}
 void f_plus_D() {	// {{{
-	info(F("f_plus_D"));
+	trace(F("+D"));
 	push2(pop2()+pop2());
 	NEXT;
 }	// }}}
 void f_minus_D() {	// {{{
-	info(F("f_minus_D"));
+	trace(F("-D"));
 	DOUBLE_t c=pop2();
 	push2(pop2()-c);
 	NEXT;
 }	// }}}
 void f_times_D() {	// {{{
-	info(F("f_times_D"));
+	trace(F("*D"));
 	push2(pop2()*pop2());
 	NEXT;
 }	// }}}
 void f_div_D() {	// {{{
-	info(F("f_div_D"));
+	trace(F("/D"));
 	DOUBLE_t a=pop2();
 	push2(pop2()/a);
 	NEXT;
 }	// }}}
 void f_div2_D() {	// {{{
-	info(F("f_div2_D"));
+	trace(F("/2D"));
 	push2(pop2()/2);
 	NEXT;
 }	// }}}
 void f_div4_D() {	// {{{
-	info(F("f_div4_D"));
+	trace(F("/4D"));
 	push2(pop2()/4);
 	NEXT;
 }	// }}}
+void f_c2C() {	// {{{ ; cell -> 2 C
+	trace(F("c2C"));
+	CELL_t c=pop();
+	push((c>>8)&0xFF);
+	push(c&0xFF);
+	NEXT;
+}	// }}}
+void f_D4C() {	// {{{ ; Double -> 4C
+	trace(F("D4C"));
+	DOUBLE_t d=pop2();
+	push((d>>24)&0xFF);
+	push((d>>16)&0xFF);
+	push((d>>8)&0xFF);
+	push(d&0xFF);
+	NEXT;
+}	// }}}
+void f_2Cc() {	// {{{ ; 2 C -> cell
+	trace(F("2Cc"));
+	CELL_t c=pop();
+	push((pop()<<8)+c);
+	NEXT;
+}	// }}}
+void f_4CD() {	// {{{ ; 4 C -> Double
+	trace(F("4CD"));
+	DOUBLE_t d=pop();
+	d+=pop()*0x100;
+	d+=pop()*0x10000;
+	d+=pop()*0x1000000;
+	push2(d);
+	
+	NEXT;
+}	// }}}
+void f_1minus() {	// {{{ ; decrement TOS by 1
+	trace(F("1-"));
+	stck[stack-1]--;
+	NEXT;
+}	// }}}
+void f_4minus() {	// {{{ ; decrement TOS by 4
+	trace(F("4-"));
+	stck[stack-1]-=4;
+	NEXT;
+}	// }}}
 void f_Store(){	// {{{ ! ( cell Daddr --  ) store cell at address(Double)
-	info(F("f_Store"));
+	trace(F("!"));
 	DOUBLE_t d=pop2();
 	*(CELL_t*)B3PTR(d)=pop();
 	NEXT;
 }	// }}}
 void f_StoreChar(){	// {{{ !C ( char Daddr -- ) store char at address(Double)
-	info(F("f_StoreChar"));
+	trace(F("!C"));
 	DOUBLE_t d=pop2();
 	uint8_t v=pop();
 	*(uint8_t*)B3PTR(d)=v;
 	NEXT;
 }	// }}}
 void f_StoreDouble(){	// {{{ !D ( D Daddr -- ) store Double at address(Double)
-	info(F("f_StoreDouble"));
+	trace(F("!D"));
 	DOUBLE_t d=pop2();
 	*(uint32_t*)B3PTR(d)=pop2();
 	NEXT;
 }	// }}}
 void f_At(){	// {{{ @ ( Daddr -- cell ) cell at address(Double)
-	info(F("f_At"));
+	trace(F("@"));
 	push(B2at(pop2()));
 	NEXT;
 }	// }}}
 void f_CharAt(){	// {{{ C@ ( Daddr -- char ) char at address(Double)
-	info(F("f_CharAt"));
+	trace(F("C@"));
 	push(B2at(pop2())&0xFF);
 	NEXT;
 }	// }}}
 void f_DoubleAt(){	// {{{ D@ ( Daddr -- D ) Double at address(Double)
-	info(F("f_DoubleAt"));
+	trace(F("D@"));
 	push2(B4at(pop2()));
 	NEXT;
 }	// }}}
 void f_hex(){	// {{{
-	info(F("f_hex"));
+	trace(F("hex"));
 	BASE=16;
 	NEXT;
 }	// }}}
 void f_dec(){	// {{{
-	info(F("f_dec"));
+	trace(F("dec"));
 	BASE=10;
 	NEXT;
 }	// }}}
 void f_bin(){	// {{{
-	info(F("f_bin"));
+	trace(F("bin"));
 	BASE=2;
 	NEXT;
 }	// }}}
 // }}}
 DOUBLE_t cw2h(DOUBLE_t cw) {	// {{{ codeword address to head address
-	info(F("cw2h"));
+	trace(F("cw2h"));
 	if (!cw) return 0;
 	uint8_t i =0;
 	cw--;
@@ -464,7 +516,7 @@ DOUBLE_t cw2h(DOUBLE_t cw) {	// {{{ codeword address to head address
 	return 0;
 }	// }}}
 void f_cw2h() {	// {{{ ; ( cw -- h ) convert codeword address to head address
-	info(F("f_cw2h"));
+	trace(F("f_cw2h"));
 	push2(cw2h(pop2()));
 	NEXT;
 }	// }}}
@@ -490,13 +542,12 @@ uint8_t show_name(DOUBLE_t cw) {	// {{{ show name and address from codeword - re
 	return flags;
 }	// }}}
 void show(DOUBLE_t cw) {	// {{{ ; ' WORD show - try to show definition of WORD
-	info(F("show"));
+	trace(F("show"));
 	DOUBLE_t h=cw2h(cw);
 	DOUBLE_t val;
 	uint8_t flags;
 	if (!h) {error(F("Not a word"));return;};
 	show_name(cw);
-	write_hex24(B3U32(f_docol));
 	write_eoln();
 	if (val_of_f_docol != B3at(cw)) return;	// neumim rozepsat
 	do {
@@ -519,7 +570,7 @@ void show(DOUBLE_t cw) {	// {{{ ; ' WORD show - try to show definition of WORD
 
 }	// }}}
 void f_show() {	// {{{ ; ' WORD show - try to show definition of WORD
-	info(F("f_show"));
+	trace(F("show"));
 	DOUBLE_t cw=pop2();
 	show(cw);
 	NEXT;
@@ -529,6 +580,7 @@ void f_key(){	 // {{{ WAITS for char and puts it on stack
 	NEXT;
 }	// }}}
 void f_word() {	 // {{{ Put address and size of buff to stack
+	trace(F("WORD"));
 	get_word();
 	push2(B3U32(&word_buf));
 	push(word_buf_len);
@@ -574,7 +626,7 @@ void comma(Data_t d) {	// {{{
 }	// }}}
 */
 void f_comma() {	// {{{ take 3B address (2 CELLs) from datastack and put it to HERE
-	info(F("f_comma"));
+	trace(F(","));
 	CELL_t c=pop();
 	*(CELL_t *)B3PTR(HERE)=c;
 	HERE+=2;
@@ -584,7 +636,7 @@ void f_comma() {	// {{{ take 3B address (2 CELLs) from datastack and put it to H
 	NEXT;
 }	// }}}
 void f_dot() { 	 // {{{
-	info(F("f_dot"));
+	trace(F("."));
 	CELL_t c=pop();
 	char buf[32];
 	itoa(c, buf, BASE);
@@ -593,7 +645,7 @@ void f_dot() { 	 // {{{
 }	// }}}
 
 void f_number() {	// {{{ (addr n -- val rest ) rest= #neprevedenych znaku
-	info(F("f_number"));
+	trace(F("NUMBER"));
 	CELL_t i=pop();
 	char *buf=(char *)pop();
 	char *end;CELL_t c=strtoul(buf,&end,BASE);
@@ -601,14 +653,14 @@ void f_number() {	// {{{ (addr n -- val rest ) rest= #neprevedenych znaku
 	NEXT;
 }	// }}}
 void f_branch(){ 	 // {{{
-	info(F("f_branch"));
+	trace(F("BRANCH"));
 	int16_t c=B2at(IP);
 	int32_t cc=4*c;
 	IP+=cc;
 	NEXT;
 }	// }}}
 void f_tick() {	// {{{ ; push CW_address of next word to stack (and skip it)
-	info(F("f_tick"));
+	trace(F("'"));
 	if (STATE == st_executing) { // st_executing
 	info(F("st_executing"));
 		get_word();
@@ -624,13 +676,13 @@ void f_tick() {	// {{{ ; push CW_address of next word to stack (and skip it)
 	NEXT;
 }	// }}}
 void f_immediate() {	// {{{ ; Addr_of_header IMMEDIATE make the word immediate
-	info(F("f_immediate"));
+	trace(F("IMMEDIATE"));
 	uint32_t h=pop2();
 	*(uint8_t *)B3PTR(h+4) |= FLG_IMMEDIATE;
 	NEXT;
 }	// }}}
 void f_0branch(){ 	 // {{{	; branch if zero
-	info(F("f_0branch"));
+	trace(F("0BRANCH"));
 	int16_t c=B2at(IP);
 	if ( pop()) c=1;
 	int32_t cc=4*c;
@@ -638,32 +690,32 @@ void f_0branch(){ 	 // {{{	; branch if zero
 	NEXT;
 }	// }}}
 void f_zero() {	// {{{ ; true if zero
-	info(F("f_zero"));
+	trace(F("==0"));
 	push(pop()==0?F_TRUE:F_FALSE);
 	NEXT;
 }	// }}}
 void f_not() {	// {{{ ; true if not zero
-	info(F("f_not"));
+	trace(F("!=0"));
 	push(pop()!=0?F_FALSE:F_TRUE);
 	NEXT;
 }	// }}}
 void f_positive() {	// {{{ ; true if positive
-	info(F("f_positive"));
+	trace(F(">0"));
 	push(pop()>0?F_TRUE:F_FALSE);
 	NEXT;
 }	// }}}
 void f_positive0() {	// {{{ ; true if positive or zero
-	info(F("f_positive0"));
+	trace(F(">=0"));
 	push(pop()>=0?F_TRUE:F_FALSE);
 	NEXT;
 }	// }}}
 void f_negative() {	// {{{ ; true if negative
-	info(F("f_negative"));
+	trace(F("<0"));
 	push(pop()<0?F_TRUE:F_FALSE);
 	NEXT;
 }	// }}}
 void f_negative0() {	// {{{ ; true if negative or zero
-	info(F("f_negative0"));
+	trace(F("<=0"));
 	push(pop()<=0?F_TRUE:F_FALSE);
 	NEXT;
 }	// }}}
@@ -742,12 +794,12 @@ void print_words(void) {	// {{{ // === print all wocabulary
 	write_eoln();
 }	// }}}
 void f_words(void) {	// {{{ print all words
-	info(F("f_words"));
+	trace(F("WORDS"));
 	print_words();
 	NEXT;
 }	// }}}
 void f_dump() {	// {{{ ; Addr_of_header HIDE hide/unhide the word
-	info(F("f_dump"));
+	trace(F("dump"));
 	uint32_t addr=pop2();
 	bool d=nodebug;
 	nodebug=false;
@@ -757,13 +809,18 @@ void f_dump() {	// {{{ ; Addr_of_header HIDE hide/unhide the word
 	NEXT;
 }	// }}}
 void f_nodebug() {	// {{{ ; Addr_of_header HIDE hide/unhide the word
-	info(F("f_nodebug"));
-	nodebug=(0==pop());
+	trace(F("nodebug"));
+	nodebug=(0!=pop());
 	NEXT;
 }	// }}}
 void f_noinfo() {	// {{{ ; Addr_of_header HIDE hide/unhide the word
-	info(F("f_noinfo"));
-	noinfo=(0==pop());
+	trace(F("noinfo"));
+	noinfo=(0!=pop());
+	NEXT;
+}	// }}}
+void f_notrace() {	// {{{ ; Addr_of_header HIDE hide/unhide the word
+	trace(F("notrace"));
+	notrace=(0!=pop());
 	NEXT;
 }	// }}}
 // {{{ more primitives
@@ -787,23 +844,23 @@ void f_create(void) {	// {{{ create header of new word
 	NEXT;
 }	// }}}
 void f_right_brac() {	// {{{ ; ] goes to compile mode
-	info(F("f_right_brac"));
+	trace(F("]"));
 	STATE=st_compiling;
 	NEXT;
 }	// }}}
 void f_left_brac() {	// {{{ [ goes to immediate mode
-	info(F("f_left_brac"));
+	trace(F("["));
 	STATE=st_executing;
 	NEXT;
 }	// }}}
 void f_hidden() {	// {{{ ; Addr_of_header HIDDEN hide/unhide the word
-	info(F("f_hidden"));
+	trace(F("HIDDEN"));
 	uint32_t addr=pop2() + 4;	// flags
 	*(uint8_t *)B3PTR(addr) = B1at(addr) ^ FLG_HIDDEN;
 	NEXT;
 }	// }}}
 void f_find() {	// {{{ ; WORD FIND return Addr_of_header (or 0 0 )
-	info(F("f_find"));
+	trace(F("FIND"));
 	uint8_t len=pop();
 	uint32_t addr=pop2();
 	xpHead1 h=findHead(len,B3PTR(addr),B3PTR(LAST));

@@ -309,6 +309,7 @@ DEFWORD w_At, 0, "@", f_At
 DEFWORD w_CharAt, 0, "C@", f_CharAt
 DEFWORD w_DoubleAt, 0, "D@", f_DoubleAt
 DEFWORD w_dup, 0, "DUP", f_dup
+DEFWORD w_drop, 0, "DROP", f_drop
 DEFWORD w_swap, 0, "SWAP", f_swap
 DEFWORD w_plus,0, "+", f_plus
 DEFWORD w_minus,0, "-", f_minus
@@ -317,6 +318,7 @@ DEFWORD w_div,0, "/", f_div
 DEFWORD w_div2,0, "/2", f_div2
 DEFWORD w_div4,0, "/4", f_div4
 DEFWORD w_dup_D, 0, "DUP2", f_dup_D
+DEFWORD w_drop_D, 0, "DROP2", f_drop_D
 DEFWORD w_swap_D, 0, "SWAP2", f_swap_D
 DEFWORD w_plus_D,0, "+D", f_plus_D
 DEFWORD w_minus_D,0, "-D", f_minus_D
@@ -324,6 +326,12 @@ DEFWORD w_times_D,0, "*D", f_times_D
 DEFWORD w_div_D,0, "/D", f_div_D
 DEFWORD w_div2_D,0, "/2D", f_div2_D
 DEFWORD w_div4_D,0, "/4D", f_div4_D
+DEFWORD w_c2C,0, "c2C", f_c2C	; cell -> 2 C
+DEFWORD w_D4C,0, "D4C", f_D4C	; Double -> 4C
+DEFWORD w_2Cc,0, "2Cc", f_2Cc	; 2 C -> cell
+DEFWORD w_4CD,0, "4CD", f_4CD	; 4 C -> Double
+DEFWORD w_1minus, 0, "1-", f_1minus	; decrement TOS by 1
+DEFWORD w_4minus, 0, "4-", f_4minus	; decrement TOS by 4
 DEFWORD w_exit, 0, "EXIT", f_exit
 DEFWORD w_key,0, "KEY", f_key
 DEFWORD w_word,0,"WORD",f_word
@@ -349,6 +357,7 @@ DEFWORD w_test, 0, "TEST", f_docol
 DEFWORD w_dump, 0, "dump", f_dump
 DEFWORD w_nodebug, 0, "nodebug", f_nodebug
 DEFWORD w_noinfo, 0, "noinfo", f_noinfo
+DEFWORD w_notrace, 0, "notrace", f_notrace
 DEFWORD w_hex, 0, "hex", f_hex
 DEFWORD w_dec, 0, "dec", f_dec
 DEFWORD w_bin, 0, "bin", f_bin
@@ -386,6 +395,10 @@ DEFWORD w_semicol,FLG_IMMEDIATE,";",f_docol
 	.long w_lit2_cw, w_exit_cw, w_comma_cw		; end word
 	.long var_LAST_cw, w_DoubleAt_cw, w_hidden_cw	; unhide it
 	.long w_left_brac_cw, w_exit_cw			; back to immediate
+DEFWORD w_forget,0,"FORGET",f_docol			; forget word (and all after)
+	.long w_word_cw, w_find_cw
+	.long w_dup_D_cw, w_DoubleAt_cw, var_LAST_cw, w_StoreDouble_cw
+	.long var_HERE_cw, w_DoubleAt_cw, w_StoreDouble_cw, w_exit_cw
 DEFWORD w_if, FLG_IMMEDIATE, "IF", f_docol		; do if not zero
 	.long w_tick_cw, w_0branch_cw,w_comma_cw	; if zero, branch
 	.long var_HERE_cw, w_DoubleAt_cw, w_lit2_cw,0,w_comma_cw	; save this pos, fill 0 for now
@@ -398,6 +411,23 @@ DEFWORD w_else, FLG_IMMEDIATE, "ELSE", f_docol		; else do this
 	.long w_tick_cw, w_branch_cw,w_comma_cw		; like in IF, but branch everytime
 	.long var_HERE_cw, w_DoubleAt_cw, w_lit2_cw, 0,w_comma_cw	; save this pos, fill 0 for now
 	.long w_swap_D_cw, w_fi_cw, w_exit_cw		; swap this and IFs address and fill it like FI
+DEFWORD w_begin, FLG_IMMEDIATE, "BEGIN", f_docol	; BEGIN loop-part condition UNTIL
+	.long var_HERE_cw, w_DoubleAt_cw, w_exit_cw
+DEFWORD w_until, FLG_IMMEDIATE, "UNTIL", f_docol	; BEGIN loop-part condition UNTIL
+	.long w_tick_cw, w_0branch_cw,w_comma_cw
+	.long var_HERE_cw, w_DoubleAt_cw, w_minus_D_cw, w_div4_D_cw, w_comma_cw
+	.long w_exit_cw
+DEFWORD w_while, FLG_IMMEDIATE, "WHILE", f_docol	; BEGIN condition WHILE loop-part REPEAT
+	.long w_if_cw,w_exit_cw
+DEFWORD w_repeat, FLG_IMMEDIATE, "REPEAT", f_docol	; BEGIN condition WHILE loop-part REPEAT
+	.long w_tick_cw, w_branch_cw,w_comma_cw		; compile BRANCH
+	.long w_swap_D_cw				; get the original offset (from BEGIN)
+	.long var_HERE_cw, w_DoubleAt_cw, w_minus_D_cw, w_div4_D_cw, w_comma_cw	; and compile it after BRANCH
+	.long w_swap_D_cw
+	.long var_HERE_cw, w_DoubleAt_cw, w_swap_D_cw, w_minus_D_cw, w_div4_D_cw	; calculate the offset2
+	.long w_swap_D_cw, w_StoreDouble_cw, w_exit_cw	; and back-fill it in the original location
+
+
 
 	.global val_of_w_exit_cw, val_of_f_docol
 val_of_w_exit_cw:

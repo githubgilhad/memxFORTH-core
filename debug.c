@@ -3,6 +3,7 @@
 #include "debug.h"
 bool nodebug=true;
 bool noinfo=true;
+bool notrace=true;
 //bool nodebug=false;
 //
 extern void write_char(char c);
@@ -17,6 +18,13 @@ void error(const __memx char *c) { 	// {{{
 void info(const __memx char *c) { 	// {{{
 	if (noinfo) return;
 	write_str(F(BG_BLUE STYLE_BOLD "«" )); //0xC2 0xAB);//'«'
+	while (*c){write_char(*c++);};
+	write_str(F("»" CLR_RESET ));// 0xC2 0xBB);//'»'
+//	write_str(F( "\r\n"));
+}	// }}}
+void trace(const __memx char *c) { 	// {{{
+	if (notrace) return;
+	write_str(F(BG_GREEN STYLE_BOLD "«" )); //0xC2 0xAB);//'«'
 	while (*c){write_char(*c++);};
 	write_str(F("»" CLR_RESET ));// 0xC2 0xBB);//'»'
 //	write_str(F( "\r\n"));

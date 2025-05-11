@@ -1,4 +1,4 @@
 #pragma once
-#define VERSION_STRING "0.0.1-7-gd93dfa5++"
-#define VERSION_COMMIT "d93dfa5"
-#define VERSION_MESSAGE "IF ELSE FI show + spousta testu"
+#define VERSION_STRING "0.0.1-13-g2aae162++"
+#define VERSION_COMMIT "2aae162"
+#define VERSION_MESSAGE "Fix language classification"
