@@ -12,7 +12,10 @@ memxFORTH-core
 
 A minimal Forth-like core for AVR (ATmega328P), designed to experiment with unified RAM and FLASH word handling
 using `__memx` pointers in C. This project should result in small tool for pin manipulation on both atmega328P and atmega2560.
+
 Based on `memxFORTH-init <https://github.com/githubgilhad/memxFORTH-init>`__
+
+Fork: `NanoHomeFORTH <https://github.com/githubgilhad/NanoHomeFORTH>`__
 
 Project Goals
 -------------
