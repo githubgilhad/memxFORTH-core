@@ -23,7 +23,7 @@ B3U32noRAM:
 	cbr	r24,0x80
 	clr	r25
 	ret
-	; extern uint8_t Bat(ptr24_t p);				; {{{
+	; extern uint8_t B1at(ptr24_t p);				; {{{
 	;	takes pointer somewhere	(24bit/32bit value)
 	;	read 1 byte (as __xload_1 does) and return it as uint8_t
 	;
@@ -37,7 +37,7 @@ B1at:
 	movw r30, r22        ; ZL = r22, ZH = r23
 	lpm	r25, Z
 	sbrc	r24,7
-	ld	r22, Z
+	ld	r25, Z
 	mov	r24,r25
 	ret
 #elif defined(__AVR_ATmega2560__)
@@ -300,6 +300,7 @@ DEFVAR LAST
 DEFVAR STATE
 DEFVAR BASE
 DEFCONST2 DOCOL,f_docol
+DEFCONST2 RAM,RAM
 DEFWORD w_lit, FLG_ARG, "LIT", f_lit
 DEFWORD w_lit2, FLG_ARG, "LIT2", f_lit2
 DEFWORD w_Store, 0, "!", f_Store
