@@ -705,11 +705,10 @@ void f_number() {	// {{{ (Daddr n -- val rest ) rest= #neprevedenych znaku
 	push(c);push(i-(end-buf));
 	NEXT;
 }	// }}}
-void f_branch(){ 	 // {{{
+void f_branch(){ 	 // {{{ BRANCH .long offset ; offset -4 loop; offset +4 nop;
 	TRACE("BRANCH");
-	int16_t c=B2at(IP);
-	int32_t cc=4*c;
-	IP+=cc;
+	int32_t c=B4at(IP);
+	IP+=c;
 	NEXT;
 }	// }}}
 void f_tick() {	// {{{ ; push CW_address of next word to stack (and skip it)
@@ -734,12 +733,11 @@ void f_immediate() {	// {{{ ; Addr_of_header IMMEDIATE make the word immediate
 	*(uint8_t *)B3PTR(h+4) |= FLG_IMMEDIATE;
 	NEXT;
 }	// }}}
-void f_0branch(){ 	 // {{{	; branch if zero
+void f_0branch(){ 	 // {{{	; branch if zero; 0BRANCH .long offset ; offset -4 loop; offset +4 nop;
 	TRACE("0BRANCH");
-	int16_t c=B2at(IP);
-	if ( pop()) c=1;
-	int32_t cc=4*c;
-	IP+=cc;
+	int32_t c=B4at(IP);
+	if ( pop()) c=4;
+	IP+=c;
 	NEXT;
 }	// }}}
 void f_zero() {	// {{{ ; true if zero
