@@ -148,7 +148,8 @@ extern const __memx char w_quit_data;
 extern const __memx DOUBLE_t		val_of_w_exit_cw;
 extern const __memx DOUBLE_t		val_of_f_docol;
 
-#define NEXT f_next()
+#define NEXT
+//#define NEXT f_next()
 //void f_next() __attribute__((noreturn));
 void f_next(){
 	INFO("f_next");
@@ -161,6 +162,23 @@ DEBUG_DUMP(IP,"IP new	");
 DEBUG_DUMP(DT,"DT new	");
 DEBUG_DUMP(B3at(DT),"*DT	");
 	jmp_indirect_24(DT);
+}
+void forth_loop(uint32_t cw_addr) {
+	INFO("Start of loop");
+	uint32_t fake[2];
+	fake[0]=cw_addr;
+	fake[1]=B3U32(NULL);
+	IP=B3U32(&fake[0]);
+	while ( (IP!=B3U32(NULL)) && ( (DT=B4at(IP)) !=B3U32(NULL)) ) {
+		DT=B4at(IP);
+		DEBUG_DUMP(IP,"IP:	");
+		DEBUG_DUMP(DT,"DT:	");
+		IP+=4;
+		jmp_indirect_24(DT);
+//		((void (*)(void))B4at(DT))();
+//		((void (*)(void))B3PTR(B4at(DT)))();
+	};
+	INFO("End of loop");
 }
 
 // {{{ pop ...
@@ -970,7 +988,8 @@ void my_setup(){	// {{{
 	DEBUG_DUMP(val_of_w_exit_cw,"val_of_w_exit_cw");
 	push(0x21);
 	print_words();
-	NEXT;
+//	NEXT;
+	forth_loop(B3U32(&w_test_cw));
 	write_hex16(pop());
 // --------------------------------------------------------------------------------
 	ERROR("Full run");
@@ -982,10 +1001,16 @@ void my_setup(){	// {{{
 	DEBUG_DUMP(IP,"B3U32(&f_docol)");
 	IP=Rpop();
 	
-	NEXT;
+	forth_loop(B3U32(&w_quit_cw));
+//	NEXT;
 // --------------------------------------------------------------------------------
 	ERROR("the end");
+#if defined(__AVR_ATmega328P__) || defined(__AVR_ATmega2560__)
 	while(1){;};
+#elif defined(__PC__)
+#else
+#error undefined
+#endif
 
 };	// }}}
 void my_loop(){	// {{{
