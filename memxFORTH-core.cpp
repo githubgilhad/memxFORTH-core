@@ -35,7 +35,7 @@ void setup(){
 	Serial.println(F(": count- 0 BEGIN DUP c2C PORTF !C PORTK !C 1- DUP ==0 UNTIL c2C PORTF !C PORTK !C ;"));
 	Serial.println(F(": count+ 0 BEGIN DUP c2C PORTF !C PORTK !C 1 + DUP ==0 UNTIL c2C PORTF !C PORTK !C ;"));
 #endif
-	Serial.println(F("Test: : xx 0BRANCH [ 0 3 , ] 5 ; : xxx IF 1111 ELSE 2222 FI 3333 + ;")); 
+	Serial.println(F("Test: : xx 0BRANCH [ 0 0C , ] 0 ; : xxx IF 1111 ELSE 2222 FI 3333 + ;")); 
 
 	my_setup();
 	Serial.println(F("Setup done"));
