@@ -1,8 +1,13 @@
 *.pyc
 *.log
 *.swp
+*.elf
+*.elf.dis
+*.export
+._*
 tmp
 old
 build
 build-*
 tags
+version.h
