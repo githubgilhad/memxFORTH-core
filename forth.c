@@ -12,7 +12,7 @@
 #include "ptr24.h"
 #include "io.h"
 #include "debug.h"
-#ifdef __PC__ 
+#ifdef __PC__
 	#include "memdump.h"
 	#include <stdio.h>
 	#define PEDANT
@@ -566,28 +566,28 @@ void f_div4_D() {	// {{{
 	push2(pop2()/4);
 	NEXT;
 }	// }}}
-void f_plus21() {	// {{{ 
+void f_plus21() {	// {{{
 	TRACE("+21");
 	CELL_t  c=pop();
 	DOUBLE_t d=pop2();
 	push2(d+c);
 	NEXT;
 }	// }}}
-void f_minus21() {	// {{{ 
+void f_minus21() {	// {{{
 	TRACE("-21");
 	CELL_t  c=pop();
 	DOUBLE_t d=pop2();
 	push2(d-c);
 	NEXT;
 }	// }}}
-void f_times21() {	// {{{ 
+void f_times21() {	// {{{
 	TRACE("*21");
 	CELL_t  c=pop();
 	DOUBLE_t d=pop2();
 	push2(d*c);
 	NEXT;
 }	// }}}
-void f_div21() {	// {{{ 
+void f_div21() {	// {{{
 	TRACE("/21");
 	CELL_t  c=pop();
 	DOUBLE_t d=pop2();
@@ -798,8 +798,8 @@ void f_bin(){	// {{{
 DOUBLE_t cw2h(DOUBLE_t cw) {	// {{{ codeword address to head address
 //	TRACE("cw2h");
 	if ( ! (
-		( (B3U32(&w_firtsbuildinword_head) <= cw) && ( cw < B3U32(&w_lastbuildinword_end)) ) || 
-		( (B3U32(&RAM[0]) <= cw) && ( cw < HERE ) ) 
+		( (B3U32(&w_firtsbuildinword_head) <= cw) && ( cw < B3U32(&w_lastbuildinword_end)) ) ||
+		( (B3U32(&RAM[0]) <= cw) && ( cw < HERE ) )
 		) ) { return 0; };
 	if (!cw) return 0;
 	if (!is_in_range(cw)) return 0;
@@ -814,20 +814,19 @@ void f_cw2h() {	// {{{ ; ( cw -- h ) convert codeword address to head address
 	push2(cw2h(pop2()));
 	NEXT;
 }	// }}}
-void f_h2cw() {	// {{{ // ( h -- cw ) convert head address to codeword address
-	TRACE("h2cw");
-	DOUBLE_t h=pop2();
+DOUBLE_t h2cw(DOUBLE_t h) {	// {{{ convert head address to codeword address
 	h+=5;
 	h+=1+B1at(h);
-	push2(h);
+	return h;
+}	// }}}
+void f_h2cw() {	// {{{ // ( h -- cw ) convert head address to codeword address
+	TRACE("h2cw");
+	push2(h2cw(pop2()));
 	NEXT;
 }	// }}}
 void f_h2da() {	// {{{ // ( h -- da ) convert head address to data address
 	TRACE("h2da");
-	DOUBLE_t h=pop2();
-	h+=5;
-	h+=1+B1at(h)+4;
-	push2(h);
+	push2(h2cw(pop2())+4);
 	NEXT;
 }	// }}}
 bool get_bounds_of_word(DOUBLE_t addr,DOUBLE_t *start, DOUBLE_t *stop) {	// {{{ // Find word at addr and returns start&stop, or false
@@ -869,9 +868,8 @@ void f_memdump() {	// {{{ // ( daddr len -- ) dump data to file
 	memdump(addr,addr2-addr,fname);
 	NEXT;
 }	// }}}
-void file_do_export(FILE *f, DOUBLE_t h, DOUBLE_t top) {	// {{{ 
-	DOUBLE_t cw=h+5;
-	cw+=1+B1at(cw);
+void file_do_export(FILE *f, DOUBLE_t h, DOUBLE_t top) {	// {{{
+	DOUBLE_t cw=h2cw(h);
 	DOUBLE_t val;
 	uint8_t flags;
 	if (!h) {fprintf(f," Not a word ");return;};
@@ -892,13 +890,17 @@ void file_do_export(FILE *f, DOUBLE_t h, DOUBLE_t top) {	// {{{
 		if (flags & FLG_ARG) {
 			cw+=4;
 			val=B4at(cw);
-			DOUBLE_t hh=cw2h(val);
-			if (hh) {
-				fprintf(f," ");
-				name_to_buf(val);
-				fprintf(f,"%s",buf); 
+			fprintf(f," ");
+			DOUBLE_t h1, h2;
+			if ( get_bounds_of_word(val, &h1, &h2)) { // it MAY be word
+				if (h2cw(h1)==val) {	// it points to cw of existing word
+					name_to_buf(val);
+					fprintf(f,"%s ( 0x%08x )",buf,val);
+				} else {
+					fprintf(f,"\\'0x%08x ", val);
+				};
 			} else {
-				fprintf(f," \\'0x%08x ", val);
+				fprintf(f,"\\'0x%08x ", val);
 			};
 			val=0;
 		}
@@ -1025,14 +1027,18 @@ void show(DOUBLE_t cw) {	// {{{ ; ' WORD show - try to show definition of WORD
 		if (flags & FLG_ARG) {
 			cw+=4;
 			val=B4at(cw);
-			DOUBLE_t hh=cw2h(val);
 			write_str(F("\r\n\t\t["));
-			if (hh) {
-// write_hex32(val);
-// write_str(F("("));
-				name_to_buf(val);
-				write_str(buf);
-// write_str(F(")"));
+			DOUBLE_t h1, h2;
+			if ( get_bounds_of_word(val, &h1, &h2)) { // it MAY be word
+				if (h2cw(h1)==val) {	// it points to cw of existing word
+					name_to_buf(val);
+					write_str(buf);
+					write_str(F(" ("));
+					write_hex32(val);
+					write_str(F(")"));
+				} else {
+					write_hex32(val);
+				};
 			} else {
 				write_hex32(val);
 			};
@@ -1069,8 +1075,7 @@ void do_export(DOUBLE_t addr) {	// {{{ ; ' WORD export - try to export definitio
 		ERROR("Not a word");return;
 	};
 //	DOUBLE_t cw=h2cw(start);
-	DOUBLE_t cw=start+5;
-	cw+=1+B1at(cw);
+	DOUBLE_t cw=h2cw(start);
 	DOUBLE_t val;
 	uint8_t flags;
 	if (!start) {ERROR("Not a word");return;};
@@ -1093,11 +1098,19 @@ void do_export(DOUBLE_t addr) {	// {{{ ; ' WORD export - try to export definitio
 		if (flags & FLG_ARG) {
 			cw+=4;
 			val=B4at(cw);
-			DOUBLE_t hh=cw2h(val);
-			if (hh) {
-				write_char(' ');
-				name_to_buf(val);
-				write_str(buf);
+			write_char(' ');
+			DOUBLE_t h1, h2;
+			if ( get_bounds_of_word(val, &h1, &h2)) { // it MAY be word
+				if (h2cw(h1)==val) {	// it points to cw of existing word
+					name_to_buf(val);
+					write_str(buf);
+					write_str(F(" ( \\'0x"));
+					write_hex32(val);
+					write_str(F(" )"));
+				} else {
+					write_str(F(" \\'0x"));
+					write_hex32(val);
+				};
 			} else {
 				write_str(F(" \\'0x"));
 				write_hex32(val);
@@ -1165,7 +1178,7 @@ void f_docol() {	// {{{
 // ERROR("Press ANY key to continue");wait_for_char();
 	Rpush(IP);
 	IP=DT+4;	// README: DT points to 4B codeword, so next address is DT+4B and now it is on Data[0] in the target header
-	if (! notrace) { 
+	if (! notrace) {
 		write_eoln();
 		for (uint8_t i=0; i<Rstack; ++i) write_char('\t');
 		uint32_t p=cw2h(DT);
@@ -1188,7 +1201,7 @@ void f_docol() {	// {{{
 void f_exit(){	// {{{
 	TRACE("EXIT");
 	IP=Rpop();
-	if (! notrace) { 
+	if (! notrace) {
 		write_eoln();
 		for (uint8_t i=0; i<Rstack; ++i) write_char('\t');
 		};
@@ -1570,6 +1583,17 @@ void f_CHAR() {	// {{{ // ( -- C) read one char
 	IP=pop2();
 	NEXT;
 }	// }}}
+void f_getword() {	// {{{ // ( addr -- h end ) return range of word, in which the addr is
+	INFO("getword");
+	DOUBLE_t addr=pop2();
+	DOUBLE_t start,stop;
+	if (! get_bounds_of_word(addr,&start,&stop)) {
+		push2(0); push2(0);
+	} else {
+		push2(start); push2(stop);
+	};
+	NEXT;
+}	// }}}
 void f_firtsbuildinword() {	// {{{ // ( -- h ) firts build in word - put its header addr on stack
 	INFO("firtsbuildinword");
 	push2(B3U32(&w_firtsbuildinword_head));
@@ -1580,6 +1604,42 @@ void f_lastbuildinword() {	// {{{ // ( -- h ) last build in word - put its heade
 	push2(B3U32(&w_lastbuildinword_head));
 	NEXT;
 }	// }}}
+#if OUTPUT_TARGET == OUTPUT_TARGET_vram
+extern void BIOS_clear(char c, int col);
+extern void BIOS_set_cursor(uint8_t row, uint8_t col);
+extern uint16_t BIOS_get_key();
+extern void BIOS_wait(unsigned int dt);
+extern uint8_t vram[BIOS_ROWS][BIOS_COLS];
+void f_CLS() {	// {{{ 
+	INFO("CLS");
+	BIOS_clear(' ', 0b1111);
+	NEXT;
+}	// }}}
+void f_VRAM_yx() {	// {{{ // ( y x -- daddr ) y row, x column, daddr addr in VRAM
+	INFO("VRAM_yx");
+	CELL_t x=pop();
+	CELL_t y=pop();
+	push2(B3U32(&vram[y][x]));
+	NEXT;
+}	// }}}
+void f_CUR_yx() {	// {{{ // ( y x -- ) move cursor to  y row, x column
+	INFO("CUR_yx");
+	CELL_t x=pop();
+	CELL_t y=pop();
+	BIOS_set_cursor(y,x);
+	NEXT;
+}	// }}}
+void f_KEYpress() {	// {{{ // ( -- c ) ascii of pressed key or 0
+	INFO("KEYpress");
+	push(BIOS_get_key());
+	NEXT;
+}	// }}}
+void f_WAIT() {	// {{{ // ( c -- ) bios.wait(c)
+	INFO("WAIT");
+	BIOS_wait(pop());
+	NEXT;
+}	// }}}
+#endif
 void f_interpret(){	 // {{{
 	TRACE("INTERPRET");
 //	write_str(F("\r\n"));

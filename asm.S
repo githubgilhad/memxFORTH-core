@@ -339,6 +339,17 @@ DEFCONST2 PIN\name, 0x800000+\value
 DEFCONST2 DDR\name, 0x800001+\value
 DEFCONST2 PORT\name, 0x800002+\value
 .endm	// }}}
+#if OUTPUT_TARGET == OUTPUT_TARGET_vram
+DEFCONST2 VRAM vram
+DEFCONST2 CRAM cram
+DEFCONST2 BIOS_ROWS BIOS_ROWS
+DEFCONST2 BIOS_COLS BIOS_COLS
+DEFWORD w_CLS, 	0,	"CLS",	f_CLS
+DEFWORD w_VRAM_yx, 	0,	"VRAM_yx",	f_VRAM_yx	// ( y x -- daddr ) y row, x column, daddr addr in VRAM
+DEFWORD w_CUR_yx, 	0,	"CUR_yx",	f_CUR_yx	// ( y x -- ) move cursor to  y row, x column
+DEFWORD w_KEYpress, 	0,	"KEYpress",	f_KEYpress	// ( -- c ) ascii of pressed key or 0
+DEFWORD w_WAIT, 	0,	"WAIT",		f_WAIT		// ( c -- ) bios.wait(c)
+#endif
 #if defined(__AVR_ATmega328P__)
 PORT B, 0x23
 PORT C, 0x26
@@ -363,6 +374,7 @@ DEFWORD w_dump, 	0,	"dump",	f_dump
 DEFWORD w_show, 	0,	"show",	f_show		// ( cw -- ) show  try to show definition of WORD addressed by codeword
 DEFWORD w_export, 	0,	"export",	f_export	// ( cw -- ) try to export definition of WORD addressed by codeword for forth2inc.py
 DEFWORD w_export_all, 	0,	"export_all",	f_export_all	// (  -- ) try to export definitions of all words for forth2inc.py
+DEFWORD w_getword, 	0,	"getword",	f_getword	// ( addr -- h end ) return range of word, in which the addr is
 DEFVAR HERE
 DEFVAR LAST
 DEFVAR STATE
