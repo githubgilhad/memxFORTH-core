@@ -345,8 +345,8 @@ DEFCONST2 CRAM, cram
 DEFWORD w_VRAM_yx, 	0,	"VRAM_yx",	f_VRAM_yx	// ( y x -- daddr ) y row, x column, daddr addr in VRAM
 #endif
 #if defined(__PORTABLE_GRAPHIC__)
-DEFCONST1 MAX_ROWS, MAX_ROWS
-DEFCONST1 MAX_COLS, MAX_COLS
+DEFCONST1 "MAX_ROWS", MAX_ROWS
+DEFCONST1 "MAX_COLS", MAX_COLS
 DEFWORD w_CLS, 	0,	"CLS",	f_CLS
 DEFWORD w_fetchVRAM_yx,	0,	"VRAM_yx@",	f_fetchVRAM_yx	// ( y x -- c ) y row, x column, c character in VRAM
 DEFWORD w_storeVRAM_yx,	0,	"VRAM_yx!",	f_storeVRAM_yx	// ( y x c -- ) y row, x column, c character in VRAM
@@ -374,14 +374,14 @@ PORT L, 0x109
 DEFWORD w_memdump,	0,	"memdump",	f_memdump	// ( daddr len -- ) dump data to file
 DEFWORD w_traceback,	0,	"traceback",	f_traceback	// ( daddr len -- ) dump traceback data to file
 #endif
-DEFCONST1 "bit0", 0x01
-DEFCONST1 "bit1", 0x02
-DEFCONST1 "bit2", 0x04
-DEFCONST1 "bit3", 0x08
-DEFCONST1 "bit4", 0x10
-DEFCONST1 "bit5", 0x20
-DEFCONST1 "bit6", 0x40
-DEFCONST1 "bit7", 0x80
+DEFCONST1 bit0, 0x01
+DEFCONST1 bit1, 0x02
+DEFCONST1 bit2, 0x04
+DEFCONST1 bit3, 0x08
+DEFCONST1 bit4, 0x10
+DEFCONST1 bit5, 0x20
+DEFCONST1 bit6, 0x40
+DEFCONST1 bit7, 0x80
 DEFWORD w_dump, 	0,	"dump",	f_dump
 DEFWORD w_show, 	0,	"show",	f_show		// ( cw -- ) show  try to show definition of WORD addressed by codeword
 DEFWORD w_export, 	0,	"export",	f_export	// ( cw -- ) try to export definition of WORD addressed by codeword for forth2inc.py

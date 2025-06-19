@@ -1667,6 +1667,39 @@ void f_VRAM_yx() {	// {{{ // ( y x -- daddr ) y row, x column, daddr addr in VRA
 	push2(B3U32(&vram[y][x]));
 	NEXT;
 }	// }}}
+void f_fetchVRAM_yx() {	// {{{ // ( y x -- c ) y row, x column, c character in VRAM
+	INFO("VRAM_yx@");
+	CELL_t x=pop();
+	CELL_t y=pop();
+	if( (x<MAX_COLS) && (y<MAX_ROWS)) {
+		push(vram[y][x]);
+	} else {
+		push(0);
+		ERROR("VRAM_yx@ out");
+		write_hex16(x);
+		write_char('x');
+		write_hex16(y);
+	};
+	NEXT;
+}	// }}}
+void f_storeVRAM_yx() {	// {{{ // ( y x c -- ) y row, x column, c character in VRAM
+	INFO("VRAM_yx!");
+	CELL_t c=pop();
+	CELL_t x=pop();
+	CELL_t y=pop();
+	if( (x<MAX_COLS) && (y<MAX_ROWS)) {
+		vram[y][x]=c;
+	} else {
+		ERROR("VRAM_yx! out");
+		write_hex16(x);
+		write_char('x');
+		write_hex16(y);
+		write_char('=');
+		write_hex8(c);
+	};
+	
+	NEXT;
+}	// }}}
 
 void f_CLS() {	// {{{
 	INFO("CLS");
