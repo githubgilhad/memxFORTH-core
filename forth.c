@@ -419,6 +419,9 @@ CONST2(R_END,B3U32(&Rstck[RSTACK_LEN]))
 void	print_stack() { 	// {{{ just simple debug print
 	for (int8_t p=0;p<stack;p++) {write_char('[');write_hex16(stck[p]);write_char(']');};
 }	// }}}
+void	print_Rstack() { 	// {{{ just simple debug print
+	for (int8_t p=1;p<Rstack;p++) {write_char('<');write_hex32(Rstck[p]);write_char('>');};
+}	// }}}
 // {{{ dup, plus, ...
 void f_dup(){	// {{{
 	TRACE("DUP");
@@ -1789,7 +1792,7 @@ void f_KEYpress() {	// {{{ // ( -- c ) ascii of pressed key or 0
 }	// }}}
 void f_WAIT() {	// {{{ // ( c -- ) bios.wait(c)
 	INFO("WAIT");
-	usleep(20000*pop());
+//	usleep(20000*pop());
 	NEXT;
 }	// }}}
 #endif
@@ -1802,6 +1805,7 @@ void f_interpret(){	 // {{{
 	DEBUG_DUMP((HERE),("HERE	"));
 	if (stack>1) DEBUG_DUMP(peek2(),("*stack	"));
 	print_stack();
+	print_Rstack();
 	if (STATE==st_executing) {
 		write_str(F(PROMPT));
 	} else {
