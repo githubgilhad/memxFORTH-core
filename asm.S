@@ -573,6 +573,10 @@ DEFWORD w_semicol,FLG_IMMEDIATE,";",f_docol
 	.long var_LAST_cw, w_DoubleAt_cw, w_hidden_cw	// unhide it
 	.long w_left_brac_cw, w_exit_cw			// back to immediate
 
+DEFWORD w_emON,	0,	"emON",	f_emON			// ( -- ) enable External Memory Read chip bit bang (set ports etc)
+DEFWORD w_emR, 	0,	"em@",	f_emR			// (addr2 -- b) External Memory Read (chip bit bang)
+DEFWORD w_emW, 	0,	"emW",	f_emW			// (b addr2 -- )) External Memory Write (chip bit bang)
+
 #include "words.inc"
 #include "jones.inc"
 
