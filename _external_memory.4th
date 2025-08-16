@@ -6,7 +6,7 @@ hex
 : LN 0d 0a EMIT EMIT ;
 : CO ( corutines - cool word http://forum.6502.org/viewtopic.php?p=82648#p82648 ) R>D R>D SWAP2 D>R D>R ;
 : RB ( -- ) ( Restore Base ) R>D BASE @ >R D>R ( base under return address )  CO ( rest after callers exit) R>  BASE ! ; 
-: / ( -- ) 	( show PINs A C G ) RB  LN ." A:" DDRA C@ DUP 0= IF ." R " DROP ELSE DUP ff = IF ." W " DROP ELSE ." ?(" bin . ." ) " THEN THEN  ." 0b" PINA C@ DUP bin . SPACE hex .  ." h; C: 0b" PINC C@ DUP bin . SPACE hex .  ." h; G:  0b" PING C@ DUP DUP2 DUP2 bin . SPACE hex .  ." h " bit3 AND IF ." A16=1 " ELSE ." A16=0 " THEN bit2 AND IF ." Latch=1 (follow) " ELSE ." Latch=0 (keep) " THEN bit1 AND IF ." RamRead=1 (blocked) " ELSE ." RamRead=0 (enabled) " THEN bit0 AND IF ." RamWrite=1 (blocked) " ELSE ." RamWrite=0 (writing) " THEN  ;
+: / ( -- ) 	( show PINs A C G ) RB  LN ." A:" DDRA C@ DUP 0= IF ." R " DROP ELSE DUP ff = IF ." W " DROP ELSE ." ?(" bin . ." ) " THEN THEN  ." 0b" PINA C@ DUP bin . SPACE hex .  ." h; C:" DDRC C@ DUP 0= IF ." R " DROP ELSE DUP ff = IF ." W " DROP ELSE ." ?(" bin . ." ) " THEN THEN  ." 0b" PINC C@ DUP bin . SPACE hex .  ." h; G:  0b" PING C@ DUP DUP2 DUP2 bin . SPACE hex .  ." h " bit3 AND IF ." A16=1 " ELSE ." A16=0 " THEN bit2 AND IF ." Latch=1 (follow) " ELSE ." Latch=0 (keep) " THEN bit1 AND IF ." RamRead=1 (blocked) " ELSE ." RamRead=0 (enabled) " THEN bit0 AND IF ." RamWrite=1 (blocked) " ELSE ." RamWrite=0 (writing) " THEN  ;
 
 \ : / ( -- ) 	( show PINs A C G )  PINA C@ . SPACE PINC C@ . SPACE PINF C@ . SPACE PING C@ . ;
 
