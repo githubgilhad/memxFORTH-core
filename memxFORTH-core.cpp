@@ -4,11 +4,22 @@
 #include <Arduino.h>
 #include "version.h"
 //	 µFORTH
+//	.equ RTS_PIN,PE2 - not on official board
+//	.equ CTS_PIN,PE3
+#define RTS_PIN _BV(2)
+//	 
 extern "C" {
 	extern void my_setup();
 	extern void my_loop();
 	char read_char() {
-		if (Serial.available()) {
+		uint8_t av=Serial.available();
+		if (av > SERIAL_RX_BUFFER_SIZE/2 ) {
+			PORTE |= RTS_PIN; // set flag
+		};
+		if (av<3) {
+			PORTE &= ~RTS_PIN; // clear flag
+		};
+		if (av>0) {
 			return Serial.read();
 		} else {
 			return 0;
@@ -25,6 +36,7 @@ extern "C" {
 void setup(){
 	Serial.begin(115200); //
 	while (!Serial){;};
+	DDRE |= RTS_PIN;
 	Serial.println(F("1234567890."));
 	Serial.println(F(VERSION_STRING ));
 	Serial.println(F("  based on " VERSION_COMMIT " - " VERSION_MESSAGE ));
